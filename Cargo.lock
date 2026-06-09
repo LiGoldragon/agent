@@ -631,6 +631,7 @@ checksum = "6b947ae49db0d222b1dbc6b113ce7248a3fc3a6ca21b696717bfc000ba4484d8"
 [[package]]
 name = "meta-signal-agent"
 version = "0.2.0"
+source = "git+https://github.com/LiGoldragon/meta-signal-agent.git?branch=main#e39dcc8b137d341a02f7d287d001453c21770970"
 dependencies = [
  "nota-next",
  "rkyv",
@@ -1133,6 +1134,7 @@ checksum = "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
 [[package]]
 name = "signal-agent"
 version = "0.2.0"
+source = "git+https://github.com/LiGoldragon/signal-agent.git?branch=main#a0e8f2456b18d708c6c0deae2ae75a88618a2398"
 dependencies = [
  "nota-next",
  "rkyv",

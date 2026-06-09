@@ -33,6 +33,12 @@ pub struct ProviderCall {
     maximum_output_tokens: Option<u64>,
 }
 
+/// The instruction the daemon folds into the system message for `OutputMode::Nota`:
+/// the model must emit exactly one valid NOTA expression. NOTA has no provider-level
+/// constrained-decode mode (unlike JSON's `response_format`), so the daemon instructs,
+/// then validates the completion parses as NOTA and retries once before rejecting.
+const NOTA_OUTPUT_INSTRUCTION: &str = "Respond with exactly one valid NOTA s-expression and nothing else. NOTA uses bracket forms: parenthesised records like (Head field ...), bracketed strings like [free text], and bare camelCase or kebab-case tokens. Do not use quotation marks, markdown fences, or any prose outside the expression.";
+
 impl ProviderCall {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
@@ -81,8 +87,8 @@ impl ProviderCall {
         self.output_mode
     }
 
-    pub fn is_json_object(&self) -> bool {
-        matches!(self.output_mode, OutputMode::JsonObject)
+    pub fn is_nota(&self) -> bool {
+        matches!(self.output_mode, OutputMode::Nota)
     }
 
     pub fn temperature(&self) -> Option<f64> {
@@ -91,6 +97,39 @@ impl ProviderCall {
 
     pub fn maximum_output_tokens(&self) -> Option<u64> {
         self.maximum_output_tokens
+    }
+
+    /// A copy of this call with the NOTA-output instruction folded into the system
+    /// message — used for `OutputMode::Nota` so the model emits NOTA directly.
+    pub fn with_nota_instruction(&self) -> Self {
+        let system = match &self.system {
+            Some(existing) => format!("{existing}\n\n{NOTA_OUTPUT_INSTRUCTION}"),
+            None => NOTA_OUTPUT_INSTRUCTION.to_owned(),
+        };
+        Self {
+            system: Some(system),
+            ..self.clone()
+        }
+    }
+
+    /// A copy of this call extended with the model's invalid previous answer and a
+    /// correction turn — the single retry the daemon makes when NOTA validation fails.
+    pub fn with_nota_correction(&self, previous: &str, parse_error: &str) -> Self {
+        let mut messages = self.messages.clone();
+        messages.push(ProviderMessage::new(
+            ChatRole::Assistant,
+            previous.to_owned(),
+        ));
+        messages.push(ProviderMessage::new(
+            ChatRole::User,
+            format!(
+                "That response was not valid NOTA ({parse_error}). Reply with exactly one valid NOTA expression and nothing else."
+            ),
+        ));
+        Self {
+            messages,
+            ..self.clone()
+        }
     }
 }
 
@@ -202,9 +241,7 @@ impl FixtureProvider {
             .map(|message| message.content())
             .unwrap_or("");
         let text = match call.output_mode() {
-            OutputMode::JsonObject => {
-                format!("{{\"verdict\":\"fixture\",\"echo\":\"{last_user}\"}}")
-            }
+            OutputMode::Nota => "(Verdict accepted)".to_owned(),
             OutputMode::FreeText => format!("fixture completion for: {last_user}"),
         };
         ProviderCompletion {
@@ -229,7 +266,6 @@ pub use live::OpenAiCompatibleProvider;
 mod live {
     use super::{Provider, ProviderCall, ProviderCompletion, ProviderFailure};
     use serde::{Deserialize, Serialize};
-    use signal_agent::OutputMode;
 
     /// The reqwest-backed OpenAI-compatible provider. One client serves every
     /// configured provider — DeepSeek, MiMo, Kimi, GLM, MiniMax — because they
@@ -298,8 +334,6 @@ mod live {
         temperature: Option<f64>,
         #[serde(skip_serializing_if = "Option::is_none")]
         max_tokens: Option<u64>,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        response_format: Option<ResponseFormat>,
     }
 
     impl ChatCompletionRequest {
@@ -322,10 +356,6 @@ mod live {
                 messages,
                 temperature: call.temperature(),
                 max_tokens: call.maximum_output_tokens(),
-                response_format: match call.output_mode() {
-                    OutputMode::JsonObject => Some(ResponseFormat::json_object()),
-                    OutputMode::FreeText => None,
-                },
             }
         }
     }
@@ -334,20 +364,6 @@ mod live {
     struct ChatCompletionMessage {
         role: String,
         content: String,
-    }
-
-    #[derive(Debug, Serialize)]
-    struct ResponseFormat {
-        #[serde(rename = "type")]
-        kind: String,
-    }
-
-    impl ResponseFormat {
-        fn json_object() -> Self {
-            Self {
-                kind: "json_object".to_owned(),
-            }
-        }
     }
 
     #[derive(Debug, Deserialize)]

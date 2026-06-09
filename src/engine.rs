@@ -13,10 +13,11 @@
 //! the call — the only place the daemon touches the network, and it does so off
 //! the engine mailbox through the async effect seam, never blocking a handler.
 
+use nota_next::Document;
 use signal_agent::{
     CallRejection, CallRejectionReason, Completion, CompletionText, CompletionTokenCount,
-    OperationKind, Output, PromptTokenCount, RejectionDetail, RequestUnimplemented, StopReasonText,
-    TokenUsage, UnimplementedReason,
+    OperationKind, Output, OutputMode, PromptTokenCount, RejectionDetail, RequestUnimplemented,
+    StopReasonText, TokenUsage, UnimplementedReason,
 };
 
 use crate::provider::{Provider, ProviderCall, ProviderCompletion, ProviderFailure};
@@ -147,10 +148,41 @@ impl AgentEngine {
     }
 
     async fn complete_call(&self, call: ProviderCall) -> ProviderOutcome {
+        match call.output_mode() {
+            OutputMode::FreeText => self.complete_once(call).await,
+            OutputMode::Nota => self.complete_nota(call).await,
+        }
+    }
+
+    /// One provider call, no output validation — the `FreeText` path.
+    async fn complete_once(&self, call: ProviderCall) -> ProviderOutcome {
         match self.provider.complete(call).await {
             Ok(completion) => ProviderOutcome::Completed(Self::completion(completion)),
             Err(failure) => ProviderOutcome::Rejected(Self::failure_rejection(failure)),
         }
+    }
+
+    /// The NOTA path: the model emits NOTA directly. Inject the NOTA instruction,
+    /// validate the completion parses as NOTA, and retry once with the parse error
+    /// before rejecting with `InvalidNotaOutput`. NOTA has no provider-level
+    /// constrained-decode mode, so validate-and-retry is the reliability mechanism.
+    /// This runs inside the async `run_effect` seam, off the engine mailbox.
+    async fn complete_nota(&self, call: ProviderCall) -> ProviderOutcome {
+        let mut attempt = call.with_nota_instruction();
+        let mut last_error = String::new();
+        for _ in 0..NOTA_OUTPUT_ATTEMPTS {
+            match self.provider.complete(attempt.clone()).await {
+                Ok(completion) => match Document::parse(completion.text.as_str()) {
+                    Ok(_) => return ProviderOutcome::Completed(Self::completion(completion)),
+                    Err(error) => {
+                        last_error = error.to_string();
+                        attempt = attempt.with_nota_correction(&completion.text, &last_error);
+                    }
+                },
+                Err(failure) => return ProviderOutcome::Rejected(Self::failure_rejection(failure)),
+            }
+        }
+        ProviderOutcome::Rejected(Self::invalid_nota_rejection(&last_error))
     }
 
     fn completion(completion: ProviderCompletion) -> Completion {
@@ -201,7 +233,21 @@ impl AgentEngine {
             },
         }
     }
+
+    fn invalid_nota_rejection(last_error: &str) -> CallRejection {
+        CallRejection {
+            reason: CallRejectionReason::InvalidNotaOutput,
+            detail: RejectionDetail::new(format!(
+                "model did not produce valid NOTA after {NOTA_OUTPUT_ATTEMPTS} attempts: {last_error}"
+            )),
+        }
+    }
 }
+
+/// How many times the NOTA path asks the model for valid NOTA: the first attempt
+/// plus one correction retry. NOTA has no provider-level constrained-decode mode,
+/// so a bounded validate-and-retry is the reliability mechanism.
+const NOTA_OUTPUT_ATTEMPTS: usize = 2;
 
 /// The single origin route the agent stamps onto in-flight mail. The agent
 /// serves one request per connection on its own call stack, so there is no

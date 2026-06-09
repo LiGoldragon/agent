@@ -33,13 +33,8 @@ live-provider = ["dep:reqwest", "dep:serde", "dep:serde_json"]
 nota-next        = { git = "https://github.com/LiGoldragon/nota-next.git", branch = "main" }
 rkyv             = { version = "0.8", default-features = false, features = ["std", "bytecheck", "little_endian", "pointer_width_32", "unaligned"] }
 signal-frame     = { git = "https://github.com/LiGoldragon/signal-frame.git", branch = "main" }
-# DEV PIN: the agent triad contracts are on the `agent-llm-call-rewrite` feature
-# branch, not yet integrated to main. Path deps to the worktree checkouts keep
-# the daemon building now. When the operator integrates the contracts to main,
-# switch these to `git = "...", branch = "main"` (the micro-components rule
-# forbids cross-crate path deps for production).
-signal-agent      = { path = "../../../../home/li/wt/github.com/LiGoldragon/signal-agent" }
-meta-signal-agent = { path = "../../../../home/li/wt/github.com/LiGoldragon/meta-signal-agent" }
+signal-agent      = { git = "https://github.com/LiGoldragon/signal-agent.git", branch = "main" }
+meta-signal-agent = { git = "https://github.com/LiGoldragon/meta-signal-agent.git", branch = "main" }
 thiserror        = "2"
 tokio            = { version = "1", features = ["io-util", "rt-multi-thread", "time", "macros"] }
 triad-runtime    = { git = "https://github.com/LiGoldragon/triad-runtime.git", branch = "main" }

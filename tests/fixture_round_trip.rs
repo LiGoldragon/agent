@@ -47,7 +47,7 @@ fn guardian_prompt(provider: Option<&str>) -> Prompt {
             provider: provider.map(|name| ProviderName::new(name.to_owned())),
             temperature_milli: None,
             maximum_output_tokens: None,
-            output_mode: OutputMode::JsonObject,
+            output_mode: OutputMode::Nota,
         },
     }
 }
@@ -62,8 +62,8 @@ async fn fixture_provider_completes_a_call_offline() {
         .await;
     match output {
         Output::Completed(completion) => {
-            // The fixture echoes the last user turn into a JSON verdict.
-            assert!(completion.text.payload().contains("verdict"));
+            // The fixture returns a valid NOTA verdict; the NOTA path validates it.
+            assert!(completion.text.payload().contains("Verdict"));
             assert_eq!(completion.stop_reason.payload(), "stop");
         }
         other => panic!("expected a completion, got {other:?}"),
@@ -115,7 +115,7 @@ fn registry_resolves_prompt_to_a_provider_call() {
     // The prompt named deepseek-chat as the model; that overrides the provider's
     // default model.
     assert_eq!(call.model(), "deepseek-chat");
-    assert!(call.is_json_object());
+    assert!(call.is_nota());
 }
 
 /// Real-network test, gated on a live key. Skips silently when no key is set so
