@@ -1,0 +1,60 @@
+[package]
+name         = "agent"
+version      = "0.1.0"
+edition      = "2024"
+rust-version = "1.89"
+license      = "MIT OR Apache-2.0"
+repository   = "https://github.com/LiGoldragon/agent"
+description  = "LLM-API-call daemon: makes OpenAI-compatible provider HTTP calls."
+
+[lib]
+name = "agent"
+path = "src/lib.rs"
+
+[[bin]]
+name = "agent"
+path = "src/bin/agent.rs"
+
+[[bin]]
+name = "agent-daemon"
+path = "src/bin/agent_daemon.rs"
+
+[features]
+default = ["nota-text"]
+# nota-text enables the NOTA text codec on the generated runtime nouns and the
+# CLI's text edge. The generated schema modules gate their NOTA surface on it.
+nota-text = ["signal-agent/nota-text", "meta-signal-agent/nota-text"]
+# `live-provider` turns on the reqwest-backed OpenAI-compatible provider. Off by
+# default so the crate (and its fixture round-trip test) builds with no network
+# stack. Real-network tests gate on an API key being present at runtime.
+live-provider = ["dep:reqwest", "dep:serde", "dep:serde_json"]
+
+[dependencies]
+nota-next        = { git = "https://github.com/LiGoldragon/nota-next.git", branch = "main" }
+rkyv             = { version = "0.8", default-features = false, features = ["std", "bytecheck", "little_endian", "pointer_width_32", "unaligned"] }
+signal-frame     = { git = "https://github.com/LiGoldragon/signal-frame.git", branch = "main" }
+# DEV PIN: the agent triad contracts are on the `agent-llm-call-rewrite` feature
+# branch, not yet integrated to main. Path deps to the worktree checkouts keep
+# the daemon building now. When the operator integrates the contracts to main,
+# switch these to `git = "...", branch = "main"` (the micro-components rule
+# forbids cross-crate path deps for production).
+signal-agent      = { path = "../../../../home/li/wt/github.com/LiGoldragon/signal-agent" }
+meta-signal-agent = { path = "../../../../home/li/wt/github.com/LiGoldragon/meta-signal-agent" }
+thiserror        = "2"
+tokio            = { version = "1", features = ["io-util", "rt-multi-thread", "time", "macros"] }
+triad-runtime    = { git = "https://github.com/LiGoldragon/triad-runtime.git", branch = "main" }
+
+reqwest      = { version = "0.12", default-features = false, features = ["json", "rustls-tls"], optional = true }
+serde        = { version = "1", features = ["derive"], optional = true }
+serde_json   = { version = "1", optional = true }
+
+[build-dependencies]
+schema-rust-next = { git = "https://github.com/LiGoldragon/schema-rust-next.git", branch = "main" }
+
+[dev-dependencies]
+tempfile = "3"
+
+[lints.rust]
+unsafe_code = "forbid"
+unused      = { level = "warn", priority = -1 }
+dead_code   = "warn"

@@ -1,0 +1,44 @@
+;; agent Nexus plane schema — daemon-owned.
+;;
+;; Runtime implementation schema, not a Signal contract. It imports the ordinary
+;; signal-agent roots and names the agent daemon's decision/effect language for
+;; one LLM call.
+;;
+;; The load-bearing feature is the `CallProvider` EFFECT: the daemon's only
+;; external IO. A decoded `Call(Prompt)` becomes `NexusWork::SignalArrived`; the
+;; Nexus `decide` emits `CommandEffect(CallProvider(Prompt))`; the generated
+;; async runner awaits `run_effect`, which makes the OpenAI-compatible
+;; /chat/completions HTTPS request off the engine mailbox (no blocking in the
+;; handler — the effect plane is the async seam). The completion comes back as
+;; `EffectCompleted(ProviderOutcome)` and Nexus replies to Signal.
+
+{
+  OrdinaryInput signal-agent:lib:Input
+  OrdinaryOutput signal-agent:lib:Output
+  Prompt signal-agent:lib:Prompt
+  Completion signal-agent:lib:Completion
+  CallRejection signal-agent:lib:CallRejection
+}
+[SignalArrived EffectCompleted]
+[ReplyToSignal CommandEffect Continue]
+{
+  SignalArrived OrdinaryInput
+  EffectCompleted ProviderOutcome
+
+  ReplyToSignal OrdinaryOutput
+  CommandEffect ProviderCallCommand
+  Continue NexusWork
+
+  ;; The one external effect: call a configured provider's chat-completions API.
+  ProviderCallCommand [(CallProvider CallProvider)]
+  CallProvider Prompt
+
+  ;; The effect's typed outcome: a completion, or a typed rejection (no provider,
+  ;; unreachable, provider rejected, output mode unsupported).
+  ProviderOutcome [(Completed Completed) (Rejected Rejected)]
+  Completed Completion
+  Rejected CallRejection
+
+  NexusWork [(SignalArrived SignalArrived) (EffectCompleted EffectCompleted)]
+  NexusAction [(ReplyToSignal ReplyToSignal) (CommandEffect CommandEffect) (Continue Continue)]
+}
