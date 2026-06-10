@@ -8,10 +8,10 @@
 //!
 //! The call flow (record-970 forward-with-effect shape): a decoded `Call(Prompt)`
 //! becomes `NexusWork::SignalArrived`; `decide` emits
-//! `CommandEffect(CallProvider(Prompt))`; the generated async runner awaits
-//! `run_effect`, which resolves the registry and asks the `Provider` to complete
-//! the call — the only place the daemon touches the network, and it does so off
-//! the engine mailbox through the async effect seam, never blocking a handler.
+//! `CommandEffect(CallProvider(Prompt))`; `execute` awaits the provider effect,
+//! which resolves the registry and asks the `Provider` to complete the call —
+//! the only place the daemon touches the network, and it does so off the engine
+//! mailbox through the async effect seam, never blocking a handler.
 
 use nota_next::Document;
 use signal_agent::{
@@ -25,8 +25,8 @@ use crate::registry::{
     EnvironmentKeySource, KeySource, ProviderEntry, ProviderRegistry, ResolveError,
 };
 use crate::schema::nexus::{
-    self as nexus_schema, CommandEffect, EffectCompleted, NexusAction, NexusEngine, NexusWork,
-    ProviderCallCommand, ProviderOutcome,
+    self as nexus_schema, CommandEffect, NexusAction, NexusEngine, NexusWork, ProviderCallCommand,
+    ProviderOutcome,
 };
 use crate::schema::sema::{
     self as sema_schema, ReadInput as SemaReadInput, ReadOutput as SemaReadOutput, SemaEngine,
@@ -89,10 +89,10 @@ impl AgentEngine {
     /// generated `NexusEngine::execute` owns the recursive runner loop; the
     /// engine supplies the decision and the async provider effect.
     pub async fn handle(&mut self, input: signal_agent::Input) -> Output {
-        let work = NexusWork::signal_arrived(input).with_origin_route(FORWARD_ORIGIN_ROUTE);
+        let work = NexusWork::signal_arrived(input).with_origin_route(forward_origin_route());
         let action = self.execute(work).await.into_root();
         match action {
-            NexusAction::ReplyToSignal(output) => output,
+            NexusAction::ReplyToSignal(output) => output.into_payload(),
             other => Output::CallRejected(CallRejection {
                 reason: CallRejectionReason::ProviderRejected,
                 detail: RejectionDetail::new(format!(
@@ -106,16 +106,16 @@ impl AgentEngine {
     fn decide_signal(&self, input: signal_agent::Input) -> NexusAction {
         match input {
             signal_agent::Input::Call(call) => {
-                NexusAction::CommandEffect(ProviderCallCommand::call_provider(call.into_payload()))
+                NexusAction::command_effect(ProviderCallCommand::call_provider(call.into_payload()))
             }
             signal_agent::Input::StreamCall(_) => {
-                NexusAction::ReplyToSignal(Output::RequestUnimplemented(RequestUnimplemented {
+                NexusAction::reply_to_signal(Output::RequestUnimplemented(RequestUnimplemented {
                     operation: OperationKind::StreamCall,
                     reason: UnimplementedReason::NotInPrototypeScope,
                 }))
             }
             signal_agent::Input::CancelStream(_) => {
-                NexusAction::ReplyToSignal(Output::RequestUnimplemented(RequestUnimplemented {
+                NexusAction::reply_to_signal(Output::RequestUnimplemented(RequestUnimplemented {
                     operation: OperationKind::CancelStream,
                     reason: UnimplementedReason::NotInPrototypeScope,
                 }))
@@ -127,10 +127,10 @@ impl AgentEngine {
     fn decide_effect_completed(&self, outcome: ProviderOutcome) -> NexusAction {
         match outcome {
             ProviderOutcome::Completed(completion) => {
-                NexusAction::ReplyToSignal(Output::Completed(completion))
+                NexusAction::reply_to_signal(Output::Completed(completion.into_payload()))
             }
             ProviderOutcome::Rejected(rejection) => {
-                NexusAction::ReplyToSignal(Output::CallRejected(rejection))
+                NexusAction::reply_to_signal(Output::CallRejected(rejection.into_payload()))
             }
         }
     }
@@ -140,10 +140,11 @@ impl AgentEngine {
     /// makes the OpenAI-compatible call through the `Provider`, and lifts the
     /// result into a typed `ProviderOutcome`.
     async fn run_provider_effect(&self, command: CommandEffect) -> ProviderOutcome {
-        let ProviderCallCommand::CallProvider(prompt) = command;
+        let ProviderCallCommand::CallProvider(prompt) = command.into_payload();
+        let prompt = prompt.into_payload();
         match self.registry.resolve(&prompt, self.keys.as_ref()) {
             Ok(call) => self.complete_call(call).await,
-            Err(error) => ProviderOutcome::Rejected(Self::resolve_rejection(error)),
+            Err(error) => ProviderOutcome::rejected(Self::resolve_rejection(error)),
         }
     }
 
@@ -157,8 +158,8 @@ impl AgentEngine {
     /// One provider call, no output validation — the `FreeText` path.
     async fn complete_once(&self, call: ProviderCall) -> ProviderOutcome {
         match self.provider.complete(call).await {
-            Ok(completion) => ProviderOutcome::Completed(Self::completion(completion)),
-            Err(failure) => ProviderOutcome::Rejected(Self::failure_rejection(failure)),
+            Ok(completion) => ProviderOutcome::completed(Self::completion(completion)),
+            Err(failure) => ProviderOutcome::rejected(Self::failure_rejection(failure)),
         }
     }
 
@@ -173,16 +174,16 @@ impl AgentEngine {
         for _ in 0..NOTA_OUTPUT_ATTEMPTS {
             match self.provider.complete(attempt.clone()).await {
                 Ok(completion) => match Document::parse(completion.text.as_str()) {
-                    Ok(_) => return ProviderOutcome::Completed(Self::completion(completion)),
+                    Ok(_) => return ProviderOutcome::completed(Self::completion(completion)),
                     Err(error) => {
                         last_error = error.to_string();
                         attempt = attempt.with_nota_correction(&completion.text, &last_error);
                     }
                 },
-                Err(failure) => return ProviderOutcome::Rejected(Self::failure_rejection(failure)),
+                Err(failure) => return ProviderOutcome::rejected(Self::failure_rejection(failure)),
             }
         }
-        ProviderOutcome::Rejected(Self::invalid_nota_rejection(&last_error))
+        ProviderOutcome::rejected(Self::invalid_nota_rejection(&last_error))
     }
 
     fn completion(completion: ProviderCompletion) -> Completion {
@@ -242,34 +243,6 @@ impl AgentEngine {
             )),
         }
     }
-}
-
-/// How many times the NOTA path asks the model for valid NOTA: the first attempt
-/// plus one correction retry. NOTA has no provider-level constrained-decode mode,
-/// so a bounded validate-and-retry is the reliability mechanism.
-const NOTA_OUTPUT_ATTEMPTS: usize = 2;
-
-/// The single origin route the agent stamps onto in-flight mail. The agent
-/// serves one request per connection on its own call stack, so there is no
-/// concurrent in-flight mail to disambiguate; the route is a constant.
-const FORWARD_ORIGIN_ROUTE: nexus_schema::OriginRoute = nexus_schema::OriginRoute(1);
-
-impl NexusEngine for AgentEngine {
-    fn decide(
-        &mut self,
-        input: nexus_schema::nexus::Nexus<nexus_schema::nexus::Work>,
-    ) -> nexus_schema::nexus::Nexus<nexus_schema::nexus::Action> {
-        let origin_route = input.origin_route();
-        let action = match input.into_root() {
-            NexusWork::SignalArrived(signal_input) => self.decide_signal(signal_input),
-            NexusWork::EffectCompleted(outcome) => self.decide_effect_completed(outcome),
-        };
-        action.with_origin_route(origin_route)
-    }
-
-    async fn run_effect(&mut self, input: CommandEffect) -> EffectCompleted {
-        self.run_provider_effect(input).await
-    }
 
     fn budget_exhausted_reply(&self, exhausted: triad_runtime::ContinuationExhausted) -> Output {
         Output::CallRejected(CallRejection {
@@ -280,6 +253,76 @@ impl NexusEngine for AgentEngine {
                 exhausted.limit().count()
             )),
         })
+    }
+}
+
+/// How many times the NOTA path asks the model for valid NOTA: the first attempt
+/// plus one correction retry. NOTA has no provider-level constrained-decode mode,
+/// so a bounded validate-and-retry is the reliability mechanism.
+const NOTA_OUTPUT_ATTEMPTS: usize = 2;
+
+/// The single origin route the agent stamps onto in-flight mail. The agent
+/// serves one request per connection on its own call stack, so there is no
+/// concurrent in-flight mail to disambiguate; the route is a constant.
+fn forward_origin_route() -> nexus_schema::OriginRoute {
+    nexus_schema::OriginRoute::new(1)
+}
+
+impl NexusEngine for AgentEngine {
+    fn decide(
+        &mut self,
+        input: nexus_schema::nexus::Nexus<nexus_schema::nexus::Work>,
+    ) -> nexus_schema::nexus::Nexus<nexus_schema::nexus::Action> {
+        let origin_route = input.origin_route();
+        let action = match input.into_root() {
+            NexusWork::SignalArrived(signal_input) => {
+                self.decide_signal(signal_input.into_payload())
+            }
+            NexusWork::EffectCompleted(outcome) => {
+                self.decide_effect_completed(outcome.into_payload())
+            }
+        };
+        action.with_origin_route(origin_route)
+    }
+
+    fn execute(
+        &mut self,
+        input: nexus_schema::nexus::Nexus<nexus_schema::nexus::Work>,
+    ) -> impl std::future::Future<Output = nexus_schema::nexus::Nexus<nexus_schema::nexus::Action>>
+    + Send
+    + '_ {
+        async move {
+            let origin_route = input.origin_route();
+            let mut work = input;
+            let mut budget = triad_runtime::ContinuationLimit::default().budget();
+            loop {
+                if let Err(exhausted) = budget.spend_next_step() {
+                    return NexusAction::reply_to_signal(self.budget_exhausted_reply(exhausted))
+                        .with_origin_route(origin_route);
+                }
+                self.trace_nexus_entered();
+                let action = self.decide(work).into_root();
+                self.trace_nexus_decided();
+                match action {
+                    NexusAction::ReplyToSignal(_) => {
+                        return action.with_origin_route(origin_route);
+                    }
+                    NexusAction::CommandEffect(effect) => {
+                        if let Err(exhausted) = budget.spend_next_step() {
+                            return NexusAction::reply_to_signal(
+                                self.budget_exhausted_reply(exhausted),
+                            )
+                            .with_origin_route(origin_route);
+                        }
+                        let outcome = self.run_provider_effect(effect).await;
+                        work = NexusWork::effect_completed(outcome).with_origin_route(origin_route);
+                    }
+                    NexusAction::Continue(continuation) => {
+                        work = continuation.into_payload().with_origin_route(origin_route);
+                    }
+                }
+            }
+        }
     }
 }
 

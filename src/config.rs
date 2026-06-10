@@ -6,7 +6,7 @@
 //! reaches the daemon.
 //!
 //! The configuration carries the two socket paths (ordinary + meta) and the
-//! durable database path the uniform `DaemonConfiguration` trait requires. The
+//! durable database path the uniform `BindingSurface` trait requires. The
 //! provider registry is populated through the meta tier after startup, never
 //! from a flag and never from inline NOTA. An optional `bootstrap_providers`
 //! seed lets a deploy tool ship the daemon a starting registry in the binary
@@ -16,7 +16,7 @@ use std::path::Path;
 
 use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
 use thiserror::Error;
-use triad_runtime::{DaemonConfiguration, SocketMode};
+use triad_runtime::{BindingSurface, SocketMode};
 
 use crate::registry::ProviderEntry;
 
@@ -109,7 +109,7 @@ impl AgentDaemonConfiguration {
     }
 }
 
-impl DaemonConfiguration for AgentDaemonConfiguration {
+impl BindingSurface for AgentDaemonConfiguration {
     fn socket_path(&self) -> &Path {
         Path::new(&self.ordinary_socket_path)
     }

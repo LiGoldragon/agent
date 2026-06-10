@@ -27,16 +27,38 @@
           file = ./rust-toolchain.toml;
           sha256 = "sha256-gh/xTkxKHL4eiRXzWv8KP7vfjSk61Iq48x47BEDFgfk=";
         };
+        craneLib = (crane.mkLib pkgs).overrideToolchain toolchain;
+        source = pkgs.lib.cleanSource ./.;
+        commonArguments = {
+          src = source;
+          strictDeps = true;
+          cargoExtraArgs = "--features live-provider";
+        };
+        cargoArtifacts = craneLib.buildDepsOnly commonArguments;
+        agentPackage = craneLib.buildPackage (
+          commonArguments
+          // {
+            inherit cargoArtifacts;
+          }
+        );
       in
       {
-        # NOTE: the package/checks crane build is intentionally not wired yet.
-        # The agent triad contracts (signal-agent, meta-signal-agent) are pinned
-        # by `path` to the `agent-llm-call-rewrite` worktrees during development;
-        # crane cannot vendor those out-of-tree path sources reproducibly. Once
-        # the operator integrates the contracts to main and Cargo.toml switches
-        # the deps to `git`/`branch = main`, wire the standard crane
-        # buildPackage / cargoTest / cargoClippy checks here (mirroring the
-        # signal-* flakes). For now, build and test with `cargo` in the devShell.
+        packages.default = agentPackage;
+        packages.agent = agentPackage;
+
+        checks.build = craneLib.cargoBuild (
+          commonArguments
+          // {
+            inherit cargoArtifacts;
+          }
+        );
+        checks.test = craneLib.cargoTest (
+          commonArguments
+          // {
+            inherit cargoArtifacts;
+          }
+        );
+
         devShells.default = pkgs.mkShell {
           name = "agent";
           packages = [

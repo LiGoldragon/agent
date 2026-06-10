@@ -19,6 +19,10 @@ path = "src/bin/agent.rs"
 name = "agent-daemon"
 path = "src/bin/agent_daemon.rs"
 
+[[bin]]
+name = "agent-write-configuration"
+path = "src/bin/agent_write_configuration.rs"
+
 [features]
 default = ["nota-text"]
 # nota-text enables the NOTA text codec on the generated runtime nouns and the

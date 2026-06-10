@@ -36,7 +36,7 @@ pub mod schema {
     pub mod daemon;
 }
 
-pub use config::{AgentDaemonConfiguration, ConfigurationError};
+pub use config::{AgentDaemonConfiguration, ConfigurationError, ProviderSeed};
 pub use engine::AgentEngine;
 pub use error::{Error, Result};
 pub use provider::{FixtureProvider, Provider, ProviderCall, ProviderCompletion, ProviderFailure};
