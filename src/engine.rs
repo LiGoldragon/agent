@@ -171,10 +171,10 @@ impl AgentEngine {
         let mut last_error = String::new();
         for _ in 0..NOTA_OUTPUT_ATTEMPTS {
             match self.provider.complete(attempt.clone()).await {
-                Ok(completion) => match Document::parse(completion.text.as_str()) {
+                Ok(completion) => match Self::validate_nota_completion(completion.text.as_str()) {
                     Ok(_) => return ProviderOutcome::completed(Self::completion(completion)),
                     Err(error) => {
-                        last_error = error.to_string();
+                        last_error = error;
                         attempt = attempt.with_nota_correction(&completion.text, &last_error);
                     }
                 },
@@ -182,6 +182,18 @@ impl AgentEngine {
             }
         }
         ProviderOutcome::rejected(Self::invalid_nota_rejection(&last_error))
+    }
+
+    fn validate_nota_completion(text: &str) -> Result<(), String> {
+        let document = Document::parse(text).map_err(|error| error.to_string())?;
+        if document.holds_root_objects() == 1 {
+            Ok(())
+        } else {
+            Err(format!(
+                "expected exactly one NOTA root object, found {}",
+                document.holds_root_objects()
+            ))
+        }
     }
 
     fn completion(completion: ProviderCompletion) -> Completion {

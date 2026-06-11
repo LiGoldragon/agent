@@ -6,7 +6,9 @@
 //! `live_deepseek_flash_returns_valid_nota_with_gopass_key`), so CI stays
 //! offline.
 
-use agent::provider::{ProviderApiKey, ProviderCall};
+use agent::provider::{
+    Provider, ProviderApiKey, ProviderCall, ProviderCompletion, ProviderCompletionFuture,
+};
 use agent::registry::{
     KeySource, KeySourceFuture, ProviderEntry, ProviderRegistry, SecretSource, SystemKeySource,
 };
@@ -29,9 +31,33 @@ const DEEPSEEK_GOPASS_PATH: &str = "platform.deepseek.com/api-key";
 /// with a fixed literal, so a fixture call resolves without a real key.
 struct LiteralKeySource;
 
+struct StaticProvider {
+    text: &'static str,
+}
+
 impl KeySource for LiteralKeySource {
     fn resolve(&self, _source: SecretSource) -> KeySourceFuture<'_> {
         Box::pin(async { Ok(ProviderApiKey::new("test-key")) })
+    }
+}
+
+impl StaticProvider {
+    fn new(text: &'static str) -> Self {
+        Self { text }
+    }
+}
+
+impl Provider for StaticProvider {
+    fn complete(&self, _call: ProviderCall) -> ProviderCompletionFuture<'_> {
+        let text = self.text.to_owned();
+        Box::pin(async move {
+            Ok(ProviderCompletion {
+                text,
+                stop_reason: "stop".to_owned(),
+                prompt_tokens: None,
+                completion_tokens: None,
+            })
+        })
     }
 }
 
@@ -111,6 +137,74 @@ async fn default_provider_is_used_when_prompt_names_none() {
         .handle(Input::Call(signal_agent::Call::new(guardian_prompt(None))))
         .await;
     assert!(matches!(output, Output::Completed(_)));
+}
+
+#[tokio::test]
+async fn nota_output_rejects_empty_document() {
+    let mut engine = AgentEngine::new(
+        {
+            let mut registry = ProviderRegistry::new();
+            registry.configure(ProviderEntry::new(
+                DEEPSEEK_PROVIDER,
+                DEEPSEEK_ENDPOINT,
+                DEEPSEEK_MODEL,
+                SecretSource::environment(DEEPSEEK_KEY_HANDLE),
+            ));
+            registry
+        },
+        Box::new(StaticProvider::new("")),
+        Box::new(LiteralKeySource),
+    );
+    let output = engine
+        .handle(Input::Call(signal_agent::Call::new(guardian_prompt(Some(
+            DEEPSEEK_PROVIDER,
+        )))))
+        .await;
+    match output {
+        Output::CallRejected(rejection) => {
+            assert_eq!(rejection.reason, CallRejectionReason::InvalidNotaOutput);
+            assert!(
+                rejection.detail.payload().contains("expected exactly one"),
+                "unexpected rejection detail: {:?}",
+                rejection.detail
+            );
+        }
+        other => panic!("expected InvalidNotaOutput rejection, got {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn nota_output_rejects_multiple_root_objects() {
+    let mut engine = AgentEngine::new(
+        {
+            let mut registry = ProviderRegistry::new();
+            registry.configure(ProviderEntry::new(
+                DEEPSEEK_PROVIDER,
+                DEEPSEEK_ENDPOINT,
+                DEEPSEEK_MODEL,
+                SecretSource::environment(DEEPSEEK_KEY_HANDLE),
+            ));
+            registry
+        },
+        Box::new(StaticProvider::new("Accept Accept")),
+        Box::new(LiteralKeySource),
+    );
+    let output = engine
+        .handle(Input::Call(signal_agent::Call::new(guardian_prompt(Some(
+            DEEPSEEK_PROVIDER,
+        )))))
+        .await;
+    match output {
+        Output::CallRejected(rejection) => {
+            assert_eq!(rejection.reason, CallRejectionReason::InvalidNotaOutput);
+            assert!(
+                rejection.detail.payload().contains("expected exactly one"),
+                "unexpected rejection detail: {:?}",
+                rejection.detail
+            );
+        }
+        other => panic!("expected InvalidNotaOutput rejection, got {other:?}"),
+    }
 }
 
 #[tokio::test]
