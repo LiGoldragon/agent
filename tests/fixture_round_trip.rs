@@ -3,15 +3,23 @@
 //! witness that the Signal -> Nexus -> CallProvider effect -> reply path works.
 //!
 //! Real-network coverage is gated behind a key being present (see
-//! `live_provider_completes_when_key_present`), so CI stays offline.
+//! `live_deepseek_flash_returns_valid_nota_when_key_present`), so CI stays
+//! offline.
 
 use agent::provider::{ProviderApiKey, ProviderCall};
 use agent::registry::{KeySource, ProviderEntry, ProviderRegistry};
 use agent::{AgentEngine, FixtureProvider};
+#[cfg(feature = "live-provider")]
+use nota_next::Document;
 use signal_agent::{
-    CallRejectionReason, ChatMessage, ChatTranscript, Input, ModelName, Output, OutputMode, Prompt,
-    PromptOptions, ProviderName, SystemText,
+    CallRejectionReason, ChatMessage, ChatTranscript, Input, MaximumOutputTokens, ModelName,
+    Output, OutputMode, Prompt, PromptOptions, ProviderName, SystemText, TemperatureMilli,
 };
+
+const DEEPSEEK_PROVIDER: &str = "deepseek";
+const DEEPSEEK_ENDPOINT: &str = "https://api.deepseek.com/v1";
+const DEEPSEEK_MODEL: &str = "deepseek-v4-flash";
+const DEEPSEEK_KEY_HANDLE: &str = "DEEPSEEK_API_KEY";
 
 /// A test key source that needs no process environment: it answers every handle
 /// with a fixed literal, so a fixture call resolves without a real key.
@@ -26,10 +34,10 @@ impl KeySource for LiteralKeySource {
 fn engine_with_deepseek() -> AgentEngine {
     let mut registry = ProviderRegistry::new();
     registry.configure(ProviderEntry::new(
-        "deepseek",
-        "https://api.deepseek.com/v1",
-        "deepseek-chat",
-        "DEEPSEEK_API_KEY",
+        DEEPSEEK_PROVIDER,
+        DEEPSEEK_ENDPOINT,
+        DEEPSEEK_MODEL,
+        DEEPSEEK_KEY_HANDLE,
     ));
     AgentEngine::new(
         registry,
@@ -41,12 +49,14 @@ fn engine_with_deepseek() -> AgentEngine {
 fn guardian_prompt(provider: Option<&str>) -> Prompt {
     Prompt {
         system: Some(SystemText::new("You judge intent.".to_owned())),
-        transcript: ChatTranscript::new(vec![ChatMessage::user("Is this a durable decision?")]),
+        transcript: ChatTranscript::new(vec![ChatMessage::user(
+            "Reply exactly with this NOTA expression: (Verdict accepted)",
+        )]),
         options: PromptOptions {
-            model: Some(ModelName::new("deepseek-chat".to_owned())),
+            model: Some(ModelName::new(DEEPSEEK_MODEL.to_owned())),
             provider: provider.map(|name| ProviderName::new(name.to_owned())),
-            temperature_milli: None,
-            maximum_output_tokens: None,
+            temperature_milli: Some(TemperatureMilli::new(0)),
+            maximum_output_tokens: Some(MaximumOutputTokens::new(64)),
             output_mode: OutputMode::Nota,
         },
     }
@@ -57,7 +67,7 @@ async fn fixture_provider_completes_a_call_offline() {
     let mut engine = engine_with_deepseek();
     let output = engine
         .handle(Input::Call(signal_agent::Call::new(guardian_prompt(Some(
-            "deepseek",
+            DEEPSEEK_PROVIDER,
         )))))
         .await;
     match output {
@@ -112,9 +122,9 @@ fn registry_resolves_prompt_to_a_provider_call() {
         .resolve(&guardian_prompt(Some("mimo")), &LiteralKeySource)
         .expect("resolve");
     assert_eq!(call.endpoint(), "https://api.mimo.example/v1");
-    // The prompt named deepseek-chat as the model; that overrides the provider's
+    // The prompt named a DeepSeek model; that overrides the provider's
     // default model.
-    assert_eq!(call.model(), "deepseek-chat");
+    assert_eq!(call.model(), DEEPSEEK_MODEL);
     assert!(call.is_nota());
 }
 
@@ -123,17 +133,17 @@ fn registry_resolves_prompt_to_a_provider_call() {
 /// with `--features live-provider`, this exercises the real HTTPS call.
 #[cfg(feature = "live-provider")]
 #[tokio::test]
-async fn live_provider_completes_when_key_present() {
-    let Ok(_key) = std::env::var("DEEPSEEK_API_KEY") else {
+async fn live_deepseek_flash_returns_valid_nota_when_key_present() {
+    let Ok(_key) = std::env::var(DEEPSEEK_KEY_HANDLE) else {
         eprintln!("skipping: DEEPSEEK_API_KEY not set");
         return;
     };
     let mut registry = ProviderRegistry::new();
     registry.configure(ProviderEntry::new(
-        "deepseek",
-        "https://api.deepseek.com/v1",
-        "deepseek-chat",
-        "DEEPSEEK_API_KEY",
+        DEEPSEEK_PROVIDER,
+        DEEPSEEK_ENDPOINT,
+        DEEPSEEK_MODEL,
+        DEEPSEEK_KEY_HANDLE,
     ));
     let mut engine = AgentEngine::with_environment_keys(
         registry,
@@ -141,11 +151,18 @@ async fn live_provider_completes_when_key_present() {
     );
     let output = engine
         .handle(Input::Call(signal_agent::Call::new(guardian_prompt(Some(
-            "deepseek",
+            DEEPSEEK_PROVIDER,
         )))))
         .await;
-    assert!(
-        matches!(output, Output::Completed(_)),
-        "live call did not complete: {output:?}"
-    );
+    match output {
+        Output::Completed(completion) => {
+            let text = completion.text.payload();
+            Document::parse(text).expect("live DeepSeek completion must be valid NOTA");
+            assert!(
+                text.contains("Verdict"),
+                "live completion had valid NOTA but not the requested verdict: {text}"
+            );
+        }
+        other => panic!("live call did not complete: {other:?}"),
+    }
 }

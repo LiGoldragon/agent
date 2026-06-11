@@ -89,7 +89,7 @@ impl AgentEngine {
     /// generated `NexusEngine::execute` owns the recursive runner loop; the
     /// engine supplies the decision and the async provider effect.
     pub async fn handle(&mut self, input: signal_agent::Input) -> Output {
-        let work = NexusWork::signal_arrived(input).with_origin_route(forward_origin_route());
+        let work = NexusWork::signal_arrived(input).with_origin_route(Self::forward_origin_route());
         let action = self.execute(work).await.into_root();
         match action {
             NexusAction::ReplyToSignal(output) => output.into_payload(),
@@ -254,19 +254,19 @@ impl AgentEngine {
             )),
         })
     }
+
+    /// The single origin route the agent stamps onto in-flight mail. The agent
+    /// serves one request per connection on its own call stack, so there is no
+    /// concurrent in-flight mail to disambiguate; the route is a constant.
+    fn forward_origin_route() -> nexus_schema::OriginRoute {
+        nexus_schema::OriginRoute::new(1)
+    }
 }
 
 /// How many times the NOTA path asks the model for valid NOTA: the first attempt
 /// plus one correction retry. NOTA has no provider-level constrained-decode mode,
 /// so a bounded validate-and-retry is the reliability mechanism.
 const NOTA_OUTPUT_ATTEMPTS: usize = 2;
-
-/// The single origin route the agent stamps onto in-flight mail. The agent
-/// serves one request per connection on its own call stack, so there is no
-/// concurrent in-flight mail to disambiguate; the route is a constant.
-fn forward_origin_route() -> nexus_schema::OriginRoute {
-    nexus_schema::OriginRoute::new(1)
-}
 
 impl NexusEngine for AgentEngine {
     fn decide(
@@ -285,41 +285,37 @@ impl NexusEngine for AgentEngine {
         action.with_origin_route(origin_route)
     }
 
-    fn execute(
+    async fn execute(
         &mut self,
         input: nexus_schema::nexus::Nexus<nexus_schema::nexus::Work>,
-    ) -> impl std::future::Future<Output = nexus_schema::nexus::Nexus<nexus_schema::nexus::Action>>
-    + Send
-    + '_ {
-        async move {
-            let origin_route = input.origin_route();
-            let mut work = input;
-            let mut budget = triad_runtime::ContinuationLimit::default().budget();
-            loop {
-                if let Err(exhausted) = budget.spend_next_step() {
-                    return NexusAction::reply_to_signal(self.budget_exhausted_reply(exhausted))
-                        .with_origin_route(origin_route);
+    ) -> nexus_schema::nexus::Nexus<nexus_schema::nexus::Action> {
+        let origin_route = input.origin_route();
+        let mut work = input;
+        let mut budget = triad_runtime::ContinuationLimit::default().budget();
+        loop {
+            if let Err(exhausted) = budget.spend_next_step() {
+                return NexusAction::reply_to_signal(self.budget_exhausted_reply(exhausted))
+                    .with_origin_route(origin_route);
+            }
+            self.trace_nexus_entered();
+            let action = self.decide(work).into_root();
+            self.trace_nexus_decided();
+            match action {
+                NexusAction::ReplyToSignal(_) => {
+                    return action.with_origin_route(origin_route);
                 }
-                self.trace_nexus_entered();
-                let action = self.decide(work).into_root();
-                self.trace_nexus_decided();
-                match action {
-                    NexusAction::ReplyToSignal(_) => {
-                        return action.with_origin_route(origin_route);
+                NexusAction::CommandEffect(effect) => {
+                    if let Err(exhausted) = budget.spend_next_step() {
+                        return NexusAction::reply_to_signal(
+                            self.budget_exhausted_reply(exhausted),
+                        )
+                        .with_origin_route(origin_route);
                     }
-                    NexusAction::CommandEffect(effect) => {
-                        if let Err(exhausted) = budget.spend_next_step() {
-                            return NexusAction::reply_to_signal(
-                                self.budget_exhausted_reply(exhausted),
-                            )
-                            .with_origin_route(origin_route);
-                        }
-                        let outcome = self.run_provider_effect(effect).await;
-                        work = NexusWork::effect_completed(outcome).with_origin_route(origin_route);
-                    }
-                    NexusAction::Continue(continuation) => {
-                        work = continuation.into_payload().with_origin_route(origin_route);
-                    }
+                    let outcome = self.run_provider_effect(effect).await;
+                    work = NexusWork::effect_completed(outcome).with_origin_route(origin_route);
+                }
+                NexusAction::Continue(continuation) => {
+                    work = continuation.into_payload().with_origin_route(origin_route);
                 }
             }
         }
