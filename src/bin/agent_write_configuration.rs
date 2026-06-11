@@ -13,7 +13,7 @@ use agent::{
     registry::SecretSource as RuntimeSecretSource,
 };
 use meta_signal_agent::SecretSource as ConfigurationWriterSecretSource;
-use nota_next::{Delimiter, NotaBlock, NotaDecode, NotaDecodeError, NotaEncode, NotaSource};
+use nota_next::{NotaDecode, NotaDecodeError, NotaEncode, NotaSource};
 use thiserror::Error;
 use triad_runtime::{ArgumentError, ComponentArgument, ComponentCommand};
 
@@ -32,7 +32,7 @@ struct AgentConfigurationWriterInputSource {
     text: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, NotaEncode)]
+#[derive(Debug, Clone, PartialEq, Eq, NotaDecode)]
 struct AgentConfigurationWriteRequest {
     ordinary_socket_path: ConfigurationWriterPath,
     meta_socket_path: ConfigurationWriterPath,
@@ -42,18 +42,25 @@ struct AgentConfigurationWriteRequest {
     output_path: ConfigurationWriterPath,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, NotaDecode)]
+enum AgentConfigurationWriterInput {
+    AgentConfigurationWriteRequest(AgentConfigurationWriteRequest),
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, NotaDecode, NotaEncode)]
 struct ConfigurationWriterPath(String);
 
 #[derive(Debug, Clone, PartialEq, Eq, NotaDecode, NotaEncode)]
 struct ConfigurationWriterSocketMode(u32);
 
-#[derive(Debug, Clone, PartialEq, Eq, NotaEncode)]
-struct ProviderSeed {
-    name: ConfigurationWriterProviderName,
-    endpoint: ConfigurationWriterEndpoint,
-    default_model: ConfigurationWriterModelName,
-    secret_source: ConfigurationWriterSecretSource,
+#[derive(Debug, Clone, PartialEq, Eq, NotaDecode, NotaEncode)]
+enum ProviderSeed {
+    ProviderSeed(
+        ConfigurationWriterProviderName,
+        ConfigurationWriterEndpoint,
+        ConfigurationWriterModelName,
+        ConfigurationWriterSecretSource,
+    ),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, NotaDecode, NotaEncode)]
@@ -65,9 +72,9 @@ struct ConfigurationWriterEndpoint(String);
 #[derive(Debug, Clone, PartialEq, Eq, NotaDecode, NotaEncode)]
 struct ConfigurationWriterModelName(String);
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct AgentConfigurationWriteOutput {
-    output_path: ConfigurationWriterPath,
+#[derive(Debug, Clone, PartialEq, Eq, NotaEncode)]
+enum AgentConfigurationWriteOutput {
+    AgentConfigurationWritten(ConfigurationWriterPath),
 }
 
 impl AgentConfigurationWriterCli {
@@ -116,7 +123,17 @@ impl AgentConfigurationWriterInputSource {
     }
 
     fn parse_request(&self) -> Result<AgentConfigurationWriteRequest, NotaDecodeError> {
-        NotaSource::new(&self.text).parse()
+        NotaSource::new(&self.text)
+            .parse::<AgentConfigurationWriterInput>()
+            .map(AgentConfigurationWriterInput::into_request)
+    }
+}
+
+impl AgentConfigurationWriterInput {
+    fn into_request(self) -> AgentConfigurationWriteRequest {
+        match self {
+            Self::AgentConfigurationWriteRequest(request) => request,
+        }
     }
 }
 
@@ -127,7 +144,9 @@ impl AgentConfigurationWriteRequest {
         configuration
             .write_binary_file(output_path.as_path())
             .map_err(AgentConfigurationWriterCliError::Archive)?;
-        Ok(AgentConfigurationWriteOutput { output_path })
+        Ok(AgentConfigurationWriteOutput::AgentConfigurationWritten(
+            output_path,
+        ))
     }
 
     fn configuration(self) -> AgentDaemonConfiguration {
@@ -141,52 +160,6 @@ impl AgentConfigurationWriteRequest {
                 .map(ProviderSeed::into_runtime_provider_seed)
                 .collect(),
         )
-    }
-}
-
-impl NotaDecode for AgentConfigurationWriteRequest {
-    fn from_nota_block(block: &nota_next::Block) -> Result<Self, NotaDecodeError> {
-        let body = NotaBlock::new(block)
-            .expect_body(Delimiter::Parenthesis, "AgentConfigurationWriteRequest")?;
-        let objects = body.root_objects();
-        if objects.len() != 7 {
-            return Err(NotaDecodeError::ExpectedRootCount {
-                type_name: "AgentConfigurationWriteRequest",
-                expected: 7,
-                found: objects.len(),
-            });
-        }
-        match objects[0].demote_to_string() {
-            Some("AgentConfigurationWriteRequest") => {}
-            Some(variant) => {
-                return Err(NotaDecodeError::UnknownVariant {
-                    enum_name: "AgentConfigurationWriteRequest",
-                    variant: variant.to_owned(),
-                });
-            }
-            None => {
-                return Err(NotaDecodeError::ExpectedAtom {
-                    type_name: "AgentConfigurationWriteRequest",
-                });
-            }
-        }
-        Ok(Self {
-            ordinary_socket_path: ConfigurationWriterPath::from_nota_block(&objects[1])?,
-            meta_socket_path: ConfigurationWriterPath::from_nota_block(&objects[2])?,
-            meta_socket_mode: ConfigurationWriterSocketMode::from_nota_block(&objects[3])?,
-            database_path: ConfigurationWriterPath::from_nota_block(&objects[4])?,
-            bootstrap_providers: Vec::<ProviderSeed>::from_nota_block(&objects[5])?,
-            output_path: ConfigurationWriterPath::from_nota_block(&objects[6])?,
-        })
-    }
-}
-
-impl NotaEncode for AgentConfigurationWriteOutput {
-    fn to_nota(&self) -> String {
-        Delimiter::Parenthesis.wrap([
-            String::from("AgentConfigurationWritten"),
-            self.output_path.to_nota(),
-        ])
     }
 }
 
@@ -208,46 +181,16 @@ impl ConfigurationWriterSocketMode {
 
 impl ProviderSeed {
     fn into_runtime_provider_seed(self) -> RuntimeProviderSeed {
-        RuntimeProviderSeed::new(
-            self.name.into_string(),
-            self.endpoint.into_string(),
-            self.default_model.into_string(),
-            RuntimeSecretSource::from(self.secret_source),
-        )
-    }
-}
-
-impl NotaDecode for ProviderSeed {
-    fn from_nota_block(block: &nota_next::Block) -> Result<Self, NotaDecodeError> {
-        let body = NotaBlock::new(block).expect_body(Delimiter::Parenthesis, "ProviderSeed")?;
-        let objects = body.root_objects();
-        if objects.len() != 5 {
-            return Err(NotaDecodeError::ExpectedRootCount {
-                type_name: "ProviderSeed",
-                expected: 5,
-                found: objects.len(),
-            });
-        }
-        match objects[0].demote_to_string() {
-            Some("ProviderSeed") => {}
-            Some(variant) => {
-                return Err(NotaDecodeError::UnknownVariant {
-                    enum_name: "ProviderSeed",
-                    variant: variant.to_owned(),
-                });
-            }
-            None => {
-                return Err(NotaDecodeError::ExpectedAtom {
-                    type_name: "ProviderSeed",
-                });
+        match self {
+            Self::ProviderSeed(name, endpoint, default_model, secret_source) => {
+                RuntimeProviderSeed::new(
+                    name.into_string(),
+                    endpoint.into_string(),
+                    default_model.into_string(),
+                    RuntimeSecretSource::from(secret_source),
+                )
             }
         }
-        Ok(Self {
-            name: ConfigurationWriterProviderName::from_nota_block(&objects[1])?,
-            endpoint: ConfigurationWriterEndpoint::from_nota_block(&objects[2])?,
-            default_model: ConfigurationWriterModelName::from_nota_block(&objects[3])?,
-            secret_source: ConfigurationWriterSecretSource::from_nota_block(&objects[4])?,
-        })
     }
 }
 

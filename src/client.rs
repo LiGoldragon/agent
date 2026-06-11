@@ -10,7 +10,7 @@ use std::io::Write;
 use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
 
-use signal_agent::{Input, Output};
+use signal_agent::{Input, NotaEncode, Output};
 use triad_runtime::{FrameBody, LengthPrefixedCodec};
 
 use crate::error::{Error, Result};

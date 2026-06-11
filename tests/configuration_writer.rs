@@ -28,7 +28,7 @@ impl ConfigurationWriterSandbox {
 
     fn request(&self) -> String {
         format!(
-            "(AgentConfigurationWriteRequest {} {} 384 {} [(ProviderSeed criomos-local http://prometheus.goldragon.criome:11434/v1 gemma-4-26b-a4b (Gopass platform.deepseek.com/api-key))] {})",
+            "(AgentConfigurationWriteRequest ({} {} 384 {} [(ProviderSeed (criomos-local http://prometheus.goldragon.criome:11434/v1 gemma-4-26b-a4b (Gopass platform.deepseek.com/api-key)))] {}))",
             self.ordinary_socket_path.display(),
             self.meta_socket_path.display(),
             self.database_path.display(),

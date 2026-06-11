@@ -631,7 +631,7 @@ checksum = "6b947ae49db0d222b1dbc6b113ce7248a3fc3a6ca21b696717bfc000ba4484d8"
 [[package]]
 name = "meta-signal-agent"
 version = "0.2.0"
-source = "git+https://github.com/LiGoldragon/meta-signal-agent.git?branch=main#92bfc47867c840060281aa3ba6585cf69623f809"
+source = "git+https://github.com/LiGoldragon/meta-signal-agent.git?branch=main#50eb30c7dacf245cba0384ee7afabd9a07af25cb"
 dependencies = [
  "nota-next",
  "rkyv",
@@ -674,7 +674,7 @@ dependencies = [
 [[package]]
 name = "nota-next"
 version = "0.4.0"
-source = "git+https://github.com/LiGoldragon/nota-next.git?branch=main#af6a2080d52b88ef5c6c89755ecfd3e818ffdea4"
+source = "git+https://github.com/LiGoldragon/nota-next.git?branch=main#065fa2ad2fa05bac87677f0bfa826bd92dbd139a"
 dependencies = [
  "nota-next-derive",
  "rkyv",
@@ -683,7 +683,7 @@ dependencies = [
 [[package]]
 name = "nota-next-derive"
 version = "0.2.0"
-source = "git+https://github.com/LiGoldragon/nota-next.git?branch=main#af6a2080d52b88ef5c6c89755ecfd3e818ffdea4"
+source = "git+https://github.com/LiGoldragon/nota-next.git?branch=main#065fa2ad2fa05bac87677f0bfa826bd92dbd139a"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1045,7 +1045,7 @@ checksum = "9774ba4a74de5f7b1c1451ed6cd5285a32eddb5cccb8cc655a4e50009e06477f"
 [[package]]
 name = "schema-next"
 version = "0.2.0"
-source = "git+https://github.com/LiGoldragon/schema-next.git?branch=main#ccdf5487f62ceb33e9986a59da227f43d7deb42e"
+source = "git+https://github.com/LiGoldragon/schema-next.git?branch=main#2397d5b2a4a8f35da1ba5957f48337f9a579db00"
 dependencies = [
  "nota-next",
  "rkyv",
@@ -1054,7 +1054,7 @@ dependencies = [
 [[package]]
 name = "schema-rust-next"
 version = "0.5.3"
-source = "git+https://github.com/LiGoldragon/schema-rust-next.git?branch=main#b252e81e8f77394981e4b13c05c116c0e7bd2b19"
+source = "git+https://github.com/LiGoldragon/schema-rust-next.git?branch=main#cedb2e0652b2d8e3aa24c96a82b6daee6af785ad"
 dependencies = [
  "prettyplease",
  "proc-macro2",
@@ -1134,7 +1134,7 @@ checksum = "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
 [[package]]
 name = "signal-agent"
 version = "0.2.0"
-source = "git+https://github.com/LiGoldragon/signal-agent.git?branch=main#b91254b9d43ed6cb7718c91bd939efc071283e18"
+source = "git+https://github.com/LiGoldragon/signal-agent.git?branch=main#1bc6ad9b0e5b6a9173fdc1653bd0aca756c1bb89"
 dependencies = [
  "nota-next",
  "rkyv",
