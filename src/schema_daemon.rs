@@ -77,7 +77,7 @@ impl ComponentDaemon for AgentDaemon {
     }
 
     fn build_runtime(configuration: &Self::Configuration) -> Result<Self::Engine, Self::Error> {
-        let mut engine = AgentEngine::with_environment_keys(
+        let mut engine = AgentEngine::with_system_keys(
             crate::registry::ProviderRegistry::new(),
             Self::production_provider(),
         );
@@ -156,7 +156,7 @@ impl<'engine> AgentMetaHandler<'engine> {
             name.clone(),
             configuration.endpoint.into_payload(),
             configuration.default_model.into_payload(),
-            configuration.api_key_handle.into_payload(),
+            configuration.secret_source.into(),
         ));
         meta_signal_agent::Output::ProviderConfigured(ProviderConfigured::new(
             meta_signal_agent::ProviderName::new(name),

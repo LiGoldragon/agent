@@ -631,7 +631,7 @@ checksum = "6b947ae49db0d222b1dbc6b113ce7248a3fc3a6ca21b696717bfc000ba4484d8"
 [[package]]
 name = "meta-signal-agent"
 version = "0.2.0"
-source = "git+https://github.com/LiGoldragon/meta-signal-agent.git?branch=main#c1165460b7ed7f0692096e31ac78487a8b708076"
+source = "git+https://github.com/LiGoldragon/meta-signal-agent.git?branch=main#92bfc47867c840060281aa3ba6585cf69623f809"
 dependencies = [
  "nota-next",
  "rkyv",
@@ -1166,6 +1166,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "signal-hook-registry"
+version = "1.4.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c4db69cba1110affc0e9f7bcd48bbf87b3f4fc7c61fc9155afd4c469eb3d6c1b"
+dependencies = [
+ "errno",
+ "libc",
+]
+
+[[package]]
 name = "simdutf8"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1304,6 +1314,7 @@ dependencies = [
  "libc",
  "mio",
  "pin-project-lite",
+ "signal-hook-registry",
  "socket2",
  "tokio-macros",
  "tracing",

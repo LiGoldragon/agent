@@ -21,9 +21,7 @@ use signal_agent::{
 };
 
 use crate::provider::{Provider, ProviderCall, ProviderCompletion, ProviderFailure};
-use crate::registry::{
-    EnvironmentKeySource, KeySource, ProviderEntry, ProviderRegistry, ResolveError,
-};
+use crate::registry::{KeySource, ProviderEntry, ProviderRegistry, ResolveError, SystemKeySource};
 use crate::schema::nexus::{
     self as nexus_schema, CommandEffect, NexusAction, NexusEngine, NexusWork, ProviderCallCommand,
     ProviderOutcome,
@@ -67,8 +65,8 @@ impl AgentEngine {
 
     /// The production engine: the live OpenAI-compatible provider when built with
     /// `live-provider`, the fixture otherwise, plus the environment key source.
-    pub fn with_environment_keys(registry: ProviderRegistry, provider: Box<dyn Provider>) -> Self {
-        Self::new(registry, provider, Box::new(EnvironmentKeySource))
+    pub fn with_system_keys(registry: ProviderRegistry, provider: Box<dyn Provider>) -> Self {
+        Self::new(registry, provider, Box::new(SystemKeySource))
     }
 
     pub fn registry(&self) -> &ProviderRegistry {
@@ -136,13 +134,13 @@ impl AgentEngine {
     }
 
     /// Run the one effect the agent declares: call the configured provider. This
-    /// resolves the prompt against the registry (provider, model, key handle),
+    /// resolves the prompt against the registry (provider, model, secret source),
     /// makes the OpenAI-compatible call through the `Provider`, and lifts the
     /// result into a typed `ProviderOutcome`.
     async fn run_provider_effect(&self, command: CommandEffect) -> ProviderOutcome {
         let ProviderCallCommand::CallProvider(prompt) = command.into_payload();
         let prompt = prompt.into_payload();
-        match self.registry.resolve(&prompt, self.keys.as_ref()) {
+        match self.registry.resolve(&prompt, self.keys.as_ref()).await {
             Ok(call) => self.complete_call(call).await,
             Err(error) => ProviderOutcome::rejected(Self::resolve_rejection(error)),
         }
@@ -209,9 +207,9 @@ impl AgentEngine {
                 reason: CallRejectionReason::NoProviderConfigured,
                 detail: RejectionDetail::new(format!("provider not in registry: {name}")),
             },
-            ResolveError::KeyHandleUnset(handle) => CallRejection {
+            ResolveError::SecretUnavailable(error) => CallRejection {
                 reason: CallRejectionReason::DaemonUnconfigured,
-                detail: RejectionDetail::new(format!("api key handle unset: {handle}")),
+                detail: RejectionDetail::new(format!("secret unavailable: {error}")),
             },
         }
     }

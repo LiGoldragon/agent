@@ -12,8 +12,8 @@ component-specific shape below; the universal invariants live in that skill.
 
 Per psyche Spirit `iucr` / `f8k7`: an LLM-API caller, not an agent harness.
 Harness backends are deferred. Providers are configuration: a generic
-OpenAI-compatible API (endpoint + model + key handle), so adding one is a
-`ConfigureProvider` message, never code.
+OpenAI-compatible API (endpoint + model + typed secret-source reference), so
+adding one is a `ConfigureProvider` message, never code.
 
 ## Runtime triad
 
@@ -67,11 +67,12 @@ ProviderCompletionFuture`). Two implementations:
 ## The provider registry — policy state
 
 `ProviderRegistry` holds `ProviderEntry` rows (name, endpoint, default model,
-key handle) plus a default. `resolve(prompt)` picks the provider (prompt's named
-provider, else the default), the model (prompt's, else the provider default),
-and resolves the key handle through a `KeySource`. The production `KeySource` is
-`EnvironmentKeySource` — the handle is an env-var name read at call time. Tests
-inject a literal key source so a fixture call needs no process environment.
+secret source) plus a default. `resolve(prompt)` picks the provider (prompt's
+named provider, else the default), the model (prompt's, else the provider
+default), and resolves the secret source through a `KeySource`. The production
+`KeySource` is `SystemKeySource`, which supports `Environment`, `Gopass`, and
+`File` backends. Tests inject a literal key source so a fixture call needs no
+process environment.
 
 The registry is configured through the meta tier (`handle_meta_connection`
 decodes `meta_signal_agent::Input`, mutates the registry) and seeded at startup
@@ -126,5 +127,5 @@ tests/fixture_round_trip.rs  offline fixture round-trip witness
 
 - `primary/skills/component-triad.md` — the universal triad invariants.
 - `primary/skills/actor-systems.md` — no blocking in handlers; the effect seam.
-- `primary/skills/secrets.md` — key handles, never secret values.
+- `primary/skills/secrets.md` — secret-source references, never secret values.
 - `../signal-agent/ARCHITECTURE.md`, `../meta-signal-agent/ARCHITECTURE.md`.

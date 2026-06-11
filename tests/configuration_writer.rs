@@ -28,7 +28,7 @@ impl ConfigurationWriterSandbox {
 
     fn request(&self) -> String {
         format!(
-            "(AgentConfigurationWriteRequest {} {} 384 {} [(ProviderSeed criomos-local http://prometheus.goldragon.criome:11434/v1 gemma-4-26b-a4b LOCAL_LLM_API_KEY)] {})",
+            "(AgentConfigurationWriteRequest {} {} 384 {} [(ProviderSeed criomos-local http://prometheus.goldragon.criome:11434/v1 gemma-4-26b-a4b (Gopass platform.deepseek.com/api-key))] {})",
             self.ordinary_socket_path.display(),
             self.meta_socket_path.display(),
             self.database_path.display(),
@@ -64,8 +64,8 @@ fn configuration_writer_prebuilds_binary_archive_for_daemon_startup() {
     let configuration =
         AgentDaemonConfiguration::from_binary_path(sandbox.output_path()).expect("read archive");
     assert_eq!(configuration.bootstrap_providers()[0].name, "criomos-local");
-    assert_eq!(
-        configuration.bootstrap_providers()[0].api_key_handle,
-        "LOCAL_LLM_API_KEY"
-    );
+    assert!(matches!(
+        configuration.bootstrap_providers()[0].secret_source,
+        agent::registry::SecretSource::Gopass(_)
+    ));
 }

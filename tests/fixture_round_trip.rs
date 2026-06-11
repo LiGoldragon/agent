@@ -3,11 +3,13 @@
 //! witness that the Signal -> Nexus -> CallProvider effect -> reply path works.
 //!
 //! Real-network coverage is gated behind a key being present (see
-//! `live_deepseek_flash_returns_valid_nota_when_key_present`), so CI stays
+//! `live_deepseek_flash_returns_valid_nota_with_gopass_key`), so CI stays
 //! offline.
 
 use agent::provider::{ProviderApiKey, ProviderCall};
-use agent::registry::{KeySource, ProviderEntry, ProviderRegistry};
+use agent::registry::{
+    KeySource, KeySourceFuture, ProviderEntry, ProviderRegistry, SecretSource, SystemKeySource,
+};
 use agent::{AgentEngine, FixtureProvider};
 #[cfg(feature = "live-provider")]
 use nota_next::Document;
@@ -20,14 +22,16 @@ const DEEPSEEK_PROVIDER: &str = "deepseek";
 const DEEPSEEK_ENDPOINT: &str = "https://api.deepseek.com/v1";
 const DEEPSEEK_MODEL: &str = "deepseek-v4-flash";
 const DEEPSEEK_KEY_HANDLE: &str = "DEEPSEEK_API_KEY";
+#[cfg(feature = "live-provider")]
+const DEEPSEEK_GOPASS_PATH: &str = "platform.deepseek.com/api-key";
 
 /// A test key source that needs no process environment: it answers every handle
 /// with a fixed literal, so a fixture call resolves without a real key.
 struct LiteralKeySource;
 
 impl KeySource for LiteralKeySource {
-    fn resolve(&self, _handle: &str) -> Option<ProviderApiKey> {
-        Some(ProviderApiKey::new("test-key"))
+    fn resolve(&self, _source: SecretSource) -> KeySourceFuture<'_> {
+        Box::pin(async { Ok(ProviderApiKey::new("test-key")) })
     }
 }
 
@@ -37,7 +41,7 @@ fn engine_with_deepseek() -> AgentEngine {
         DEEPSEEK_PROVIDER,
         DEEPSEEK_ENDPOINT,
         DEEPSEEK_MODEL,
-        DEEPSEEK_KEY_HANDLE,
+        SecretSource::environment(DEEPSEEK_KEY_HANDLE),
     ));
     AgentEngine::new(
         registry,
@@ -109,17 +113,18 @@ async fn default_provider_is_used_when_prompt_names_none() {
     assert!(matches!(output, Output::Completed(_)));
 }
 
-#[test]
-fn registry_resolves_prompt_to_a_provider_call() {
+#[tokio::test]
+async fn registry_resolves_prompt_to_a_provider_call() {
     let mut registry = ProviderRegistry::new();
     registry.configure(ProviderEntry::new(
         "mimo",
         "https://api.mimo.example/v1",
         "mimo-7b",
-        "MIMO_API_KEY",
+        SecretSource::environment("MIMO_API_KEY"),
     ));
     let call: ProviderCall = registry
         .resolve(&guardian_prompt(Some("mimo")), &LiteralKeySource)
+        .await
         .expect("resolve");
     assert_eq!(call.endpoint(), "https://api.mimo.example/v1");
     // The prompt named a DeepSeek model; that overrides the provider's
@@ -128,24 +133,44 @@ fn registry_resolves_prompt_to_a_provider_call() {
     assert!(call.is_nota());
 }
 
-/// Real-network test, gated on a live key. Skips silently when no key is set so
-/// CI stays offline. When `DEEPSEEK_API_KEY` is present and the crate is built
-/// with `--features live-provider`, this exercises the real HTTPS call.
+#[tokio::test]
+async fn system_key_source_reads_secret_file_without_trailing_newline() {
+    let directory = tempfile::TempDir::new().expect("tempdir");
+    let secret_path = directory.path().join("provider.key");
+    std::fs::write(&secret_path, "file-secret\n").expect("write secret");
+    let key = SystemKeySource
+        .resolve(SecretSource::file(secret_path.display().to_string()))
+        .await
+        .expect("resolve file secret");
+    assert_eq!(key.as_str(), "file-secret");
+}
+
+/// Real-network test, gated on a live gopass key. Skips silently when the key is
+/// unavailable so CI stays offline. When `platform.deepseek.com/api-key` is
+/// readable through gopass and the crate is built with `--features
+/// live-provider`, this exercises the real HTTPS call.
 #[cfg(feature = "live-provider")]
 #[tokio::test]
-async fn live_deepseek_flash_returns_valid_nota_when_key_present() {
-    let Ok(_key) = std::env::var(DEEPSEEK_KEY_HANDLE) else {
-        eprintln!("skipping: DEEPSEEK_API_KEY not set");
+async fn live_deepseek_flash_returns_valid_nota_with_gopass_key() {
+    let key_available = std::process::Command::new("gopass")
+        .arg("show")
+        .arg("-o")
+        .arg(DEEPSEEK_GOPASS_PATH)
+        .output()
+        .map(|output| output.status.success())
+        .unwrap_or(false);
+    if !key_available {
+        eprintln!("skipping: DeepSeek gopass key unavailable");
         return;
-    };
+    }
     let mut registry = ProviderRegistry::new();
     registry.configure(ProviderEntry::new(
         DEEPSEEK_PROVIDER,
         DEEPSEEK_ENDPOINT,
         DEEPSEEK_MODEL,
-        DEEPSEEK_KEY_HANDLE,
+        SecretSource::gopass(DEEPSEEK_GOPASS_PATH),
     ));
-    let mut engine = AgentEngine::with_environment_keys(
+    let mut engine = AgentEngine::with_system_keys(
         registry,
         Box::new(agent::provider::OpenAiCompatibleProvider::new()),
     );

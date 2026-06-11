@@ -16,8 +16,8 @@
 //! to a Nexus `CallProvider` effect, and the generated async runner awaits
 //! `run_effect`, which makes the OpenAI-compatible `/chat/completions` HTTPS
 //! request off the engine mailbox (no blocking in the handler). The provider is
-//! resolved from the registry by name; the API key is an env-var handle resolved
-//! at call time, never hardcoded.
+//! resolved from the registry by name; the API key is resolved from a typed
+//! secret-source backend at call time, never hardcoded.
 
 pub mod client;
 pub mod config;
@@ -40,6 +40,6 @@ pub use config::{AgentDaemonConfiguration, ConfigurationError, ProviderSeed};
 pub use engine::AgentEngine;
 pub use error::{Error, Result};
 pub use provider::{FixtureProvider, Provider, ProviderCall, ProviderCompletion, ProviderFailure};
-pub use registry::{ProviderEntry, ProviderRegistry};
+pub use registry::{ProviderEntry, ProviderRegistry, SecretSource};
 pub use schema::daemon::{ComponentDaemon, DaemonCommand, DaemonEntry, DaemonError};
 pub use schema_daemon::AgentDaemon;

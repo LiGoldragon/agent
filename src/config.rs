@@ -18,18 +18,18 @@ use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
 use thiserror::Error;
 use triad_runtime::{BindingSurface, SocketMode};
 
-use crate::registry::ProviderEntry;
+use crate::registry::{ProviderEntry, SecretSource};
 
 /// A provider seed carried in the binary startup message: the same four facts
 /// `meta-signal-agent`'s `ProviderConfiguration` carries (name, endpoint,
-/// default model, key handle). The key handle is an environment-variable name;
+/// default model, secret source). The secret source is a typed backend reference;
 /// the secret value is never in the configuration.
 #[derive(Archive, RkyvSerialize, RkyvDeserialize, Clone, Debug, PartialEq, Eq)]
 pub struct ProviderSeed {
     pub name: String,
     pub endpoint: String,
     pub default_model: String,
-    pub api_key_handle: String,
+    pub secret_source: SecretSource,
 }
 
 impl ProviderSeed {
@@ -37,13 +37,13 @@ impl ProviderSeed {
         name: impl Into<String>,
         endpoint: impl Into<String>,
         default_model: impl Into<String>,
-        api_key_handle: impl Into<String>,
+        secret_source: SecretSource,
     ) -> Self {
         Self {
             name: name.into(),
             endpoint: endpoint.into(),
             default_model: default_model.into(),
-            api_key_handle: api_key_handle.into(),
+            secret_source,
         }
     }
 
@@ -52,7 +52,7 @@ impl ProviderSeed {
             self.name,
             self.endpoint,
             self.default_model,
-            self.api_key_handle,
+            self.secret_source,
         )
     }
 }

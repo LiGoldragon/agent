@@ -1,23 +1,27 @@
 //! The provider registry — the daemon's policy state.
 //!
 //! A `ProviderEntry` is the durable shape `meta-signal-agent`'s
-//! `ProviderConfiguration` carries: name, endpoint, default model, and an
-//! API-key HANDLE (an environment-variable name). The registry resolves a
-//! `ProviderName` plus a `Prompt` into a fully-resolved `ProviderCall`, reading
-//! the secret from the environment at call time. The secret value never lives in
-//! the registry, only the handle.
+//! `ProviderConfiguration` carries: name, endpoint, default model, and a typed
+//! secret-source reference. The registry resolves a `ProviderName` plus a
+//! `Prompt` into a fully-resolved `ProviderCall`, asking the daemon-owned
+//! `KeySource` to resolve the configured backend. The secret value never lives
+//! in the registry, only the source reference.
 
+use std::path::Path;
+
+use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
 use signal_agent::{ChatMessage, Prompt};
+use thiserror::Error;
 
 use crate::provider::{ProviderApiKey, ProviderCall, ProviderMessage};
 
-/// One configured provider: the OpenAI-compatible facts plus the key handle.
+/// One configured provider: the OpenAI-compatible facts plus the secret source.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProviderEntry {
     name: String,
     endpoint: String,
     default_model: String,
-    api_key_handle: String,
+    secret_source: SecretSource,
 }
 
 impl ProviderEntry {
@@ -25,13 +29,13 @@ impl ProviderEntry {
         name: impl Into<String>,
         endpoint: impl Into<String>,
         default_model: impl Into<String>,
-        api_key_handle: impl Into<String>,
+        secret_source: SecretSource,
     ) -> Self {
         Self {
             name: name.into(),
             endpoint: endpoint.into(),
             default_model: default_model.into(),
-            api_key_handle: api_key_handle.into(),
+            secret_source,
         }
     }
 
@@ -47,8 +51,98 @@ impl ProviderEntry {
         &self.default_model
     }
 
-    pub fn api_key_handle(&self) -> &str {
-        &self.api_key_handle
+    pub fn secret_source(&self) -> &SecretSource {
+        &self.secret_source
+    }
+}
+
+/// A typed reference to where a provider API key lives. This is configuration,
+/// not a secret value.
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, Clone, Debug, PartialEq, Eq)]
+pub enum SecretSource {
+    Environment(EnvironmentVariable),
+    Gopass(GopassPath),
+    File(SecretFilePath),
+}
+
+impl SecretSource {
+    pub fn environment(variable: impl Into<String>) -> Self {
+        Self::Environment(EnvironmentVariable::new(variable))
+    }
+
+    pub fn gopass(path: impl Into<String>) -> Self {
+        Self::Gopass(GopassPath::new(path))
+    }
+
+    pub fn file(path: impl Into<String>) -> Self {
+        Self::File(SecretFilePath::new(path))
+    }
+
+    fn description(&self) -> String {
+        match self {
+            Self::Environment(variable) => format!("environment:{}", variable.as_str()),
+            Self::Gopass(path) => format!("gopass:{}", path.as_str()),
+            Self::File(path) => format!("file:{}", path.as_str()),
+        }
+    }
+}
+
+impl From<meta_signal_agent::SecretSource> for SecretSource {
+    fn from(source: meta_signal_agent::SecretSource) -> Self {
+        match source {
+            meta_signal_agent::SecretSource::Environment(secret) => {
+                Self::environment(secret.into_payload().into_payload())
+            }
+            meta_signal_agent::SecretSource::Gopass(secret) => {
+                Self::gopass(secret.into_payload().into_payload())
+            }
+            meta_signal_agent::SecretSource::File(secret) => {
+                Self::file(secret.into_payload().into_payload())
+            }
+        }
+    }
+}
+
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, Clone, Debug, PartialEq, Eq)]
+pub struct EnvironmentVariable(String);
+
+impl EnvironmentVariable {
+    pub fn new(value: impl Into<String>) -> Self {
+        Self(value.into())
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, Clone, Debug, PartialEq, Eq)]
+pub struct GopassPath(String);
+
+impl GopassPath {
+    pub fn new(value: impl Into<String>) -> Self {
+        Self(value.into())
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, Clone, Debug, PartialEq, Eq)]
+pub struct SecretFilePath(String);
+
+impl SecretFilePath {
+    pub fn new(value: impl Into<String>) -> Self {
+        Self(value.into())
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    fn as_path(&self) -> &Path {
+        Path::new(&self.0)
     }
 }
 
@@ -57,7 +151,7 @@ impl ProviderEntry {
 pub enum ResolveError {
     NoProviderConfigured,
     ProviderUnknown(String),
-    KeyHandleUnset(String),
+    SecretUnavailable(KeyResolutionError),
 }
 
 /// The set of configured providers plus the default. Held in the engine;
@@ -121,13 +215,12 @@ impl ProviderRegistry {
 
     /// Resolve a `Prompt` into a `ProviderCall`: pick the provider (the prompt's
     /// named provider, else the registry default), pick the model (the prompt's
-    /// model, else the provider's default), resolve the key handle from the
-    /// environment, and project the chat transcript. The key resolution is the
-    /// `KeySource`'s job so tests can inject a key without touching process env.
-    pub fn resolve(
+    /// model, else the provider's default), resolve the configured secret source,
+    /// and project the chat transcript.
+    pub async fn resolve(
         &self,
         prompt: &Prompt,
-        keys: &dyn KeySource,
+        keys: &(dyn KeySource + Send + Sync),
     ) -> Result<ProviderCall, ResolveError> {
         let provider_name = prompt
             .options
@@ -146,8 +239,9 @@ impl ProviderRegistry {
             .map(|model| model.payload().clone())
             .unwrap_or_else(|| entry.default_model().to_owned());
         let api_key = keys
-            .resolve(entry.api_key_handle())
-            .ok_or_else(|| ResolveError::KeyHandleUnset(entry.api_key_handle().to_owned()))?;
+            .resolve(entry.secret_source().clone())
+            .await
+            .map_err(ResolveError::SecretUnavailable)?;
         Ok(ProviderCall::new(
             entry.endpoint().to_owned(),
             model,
@@ -181,20 +275,92 @@ impl ProviderRegistry {
     }
 }
 
-/// Where the secret value for a key handle comes from. The production source
-/// reads the named environment variable; tests inject a literal so a fixture
-/// call needs no real key in the process environment.
+pub type KeySourceFuture<'source> = std::pin::Pin<
+    Box<
+        dyn std::future::Future<Output = Result<ProviderApiKey, KeyResolutionError>>
+            + Send
+            + 'source,
+    >,
+>;
+
+/// Where the secret value for a configured source comes from. The production
+/// source supports environment variables, gopass, and secret files; tests inject
+/// a literal so a fixture call needs no real key in the process environment.
 pub trait KeySource {
-    fn resolve(&self, handle: &str) -> Option<ProviderApiKey>;
+    fn resolve(&self, source: SecretSource) -> KeySourceFuture<'_>;
 }
 
-/// The production key source: resolve the handle as an environment-variable
-/// name. The secret value is read here and flows only into the `ProviderCall`.
-#[derive(Debug, Default, Clone, Copy)]
-pub struct EnvironmentKeySource;
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+pub enum KeyResolutionError {
+    #[error("environment variable is unset: {0}")]
+    EnvironmentUnset(String),
 
-impl KeySource for EnvironmentKeySource {
-    fn resolve(&self, handle: &str) -> Option<ProviderApiKey> {
-        std::env::var(handle).ok().map(ProviderApiKey::new)
+    #[error("gopass secret unavailable at {path}: {detail}")]
+    GopassUnavailable { path: String, detail: String },
+
+    #[error("secret file unavailable at {path}: {detail}")]
+    FileUnavailable { path: String, detail: String },
+
+    #[error("secret source returned an empty secret: {0}")]
+    EmptySecret(String),
+}
+
+/// The production key source. The secret value is read here and flows only into
+/// the `ProviderCall`.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct SystemKeySource;
+
+impl KeySource for SystemKeySource {
+    fn resolve(&self, source: SecretSource) -> KeySourceFuture<'_> {
+        Box::pin(async move {
+            let description = source.description();
+            let value = match source {
+                SecretSource::Environment(variable) => {
+                    std::env::var(variable.as_str()).map_err(|_| {
+                        KeyResolutionError::EnvironmentUnset(variable.as_str().to_owned())
+                    })?
+                }
+                SecretSource::Gopass(path) => Self::resolve_gopass(path).await?,
+                SecretSource::File(path) => Self::resolve_file(path).await?,
+            };
+            let api_key = ProviderApiKey::from_secret_output(value);
+            if api_key.is_empty() {
+                Err(KeyResolutionError::EmptySecret(description))
+            } else {
+                Ok(api_key)
+            }
+        })
+    }
+}
+
+impl SystemKeySource {
+    async fn resolve_gopass(path: GopassPath) -> Result<String, KeyResolutionError> {
+        let output = tokio::process::Command::new("gopass")
+            .arg("show")
+            .arg("-o")
+            .arg(path.as_str())
+            .output()
+            .await
+            .map_err(|error| KeyResolutionError::GopassUnavailable {
+                path: path.as_str().to_owned(),
+                detail: error.to_string(),
+            })?;
+        if output.status.success() {
+            Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+        } else {
+            Err(KeyResolutionError::GopassUnavailable {
+                path: path.as_str().to_owned(),
+                detail: String::from_utf8_lossy(&output.stderr).trim().to_owned(),
+            })
+        }
+    }
+
+    async fn resolve_file(path: SecretFilePath) -> Result<String, KeyResolutionError> {
+        tokio::fs::read_to_string(path.as_path())
+            .await
+            .map_err(|error| KeyResolutionError::FileUnavailable {
+                path: path.as_str().to_owned(),
+                detail: error.to_string(),
+            })
     }
 }

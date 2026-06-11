@@ -143,8 +143,16 @@ impl ProviderApiKey {
         Self(value.into())
     }
 
+    pub fn from_secret_output(value: impl Into<String>) -> Self {
+        Self(value.into().trim_end_matches(['\r', '\n']).to_owned())
+    }
+
     pub fn as_str(&self) -> &str {
         &self.0
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
     }
 }
 

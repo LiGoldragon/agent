@@ -8,7 +8,11 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use agent::{AgentDaemonConfiguration, ConfigurationError, ProviderSeed as RuntimeProviderSeed};
+use agent::{
+    AgentDaemonConfiguration, ConfigurationError, ProviderSeed as RuntimeProviderSeed,
+    registry::SecretSource as RuntimeSecretSource,
+};
+use meta_signal_agent::SecretSource as ConfigurationWriterSecretSource;
 use nota_next::{Delimiter, NotaBlock, NotaDecode, NotaDecodeError, NotaEncode, NotaSource};
 use thiserror::Error;
 use triad_runtime::{ArgumentError, ComponentArgument, ComponentCommand};
@@ -49,7 +53,7 @@ struct ProviderSeed {
     name: ConfigurationWriterProviderName,
     endpoint: ConfigurationWriterEndpoint,
     default_model: ConfigurationWriterModelName,
-    api_key_handle: ConfigurationWriterApiKeyHandle,
+    secret_source: ConfigurationWriterSecretSource,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, NotaDecode, NotaEncode)]
@@ -60,9 +64,6 @@ struct ConfigurationWriterEndpoint(String);
 
 #[derive(Debug, Clone, PartialEq, Eq, NotaDecode, NotaEncode)]
 struct ConfigurationWriterModelName(String);
-
-#[derive(Debug, Clone, PartialEq, Eq, NotaDecode, NotaEncode)]
-struct ConfigurationWriterApiKeyHandle(String);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct AgentConfigurationWriteOutput {
@@ -211,7 +212,7 @@ impl ProviderSeed {
             self.name.into_string(),
             self.endpoint.into_string(),
             self.default_model.into_string(),
-            self.api_key_handle.into_string(),
+            RuntimeSecretSource::from(self.secret_source),
         )
     }
 }
@@ -245,7 +246,7 @@ impl NotaDecode for ProviderSeed {
             name: ConfigurationWriterProviderName::from_nota_block(&objects[1])?,
             endpoint: ConfigurationWriterEndpoint::from_nota_block(&objects[2])?,
             default_model: ConfigurationWriterModelName::from_nota_block(&objects[3])?,
-            api_key_handle: ConfigurationWriterApiKeyHandle::from_nota_block(&objects[4])?,
+            secret_source: ConfigurationWriterSecretSource::from_nota_block(&objects[4])?,
         })
     }
 }
@@ -263,12 +264,6 @@ impl ConfigurationWriterEndpoint {
 }
 
 impl ConfigurationWriterModelName {
-    fn into_string(self) -> String {
-        self.0
-    }
-}
-
-impl ConfigurationWriterApiKeyHandle {
     fn into_string(self) -> String {
         self.0
     }

@@ -35,7 +35,7 @@ Both decisions shape this daemon directly:
   provider HTTP API call. It does not spawn or supervise Claude Code / Codex /
   Pi sessions; those harness backends are deferred and absent.
 - **Providers are configuration.** A provider is a row in the engine's registry
-  (name, endpoint, default model, API-key handle). The same
+  (name, endpoint, default model, typed secret-source reference). The same
   `OpenAiCompatibleProvider` serves DeepSeek, MiMo, Kimi, GLM, and MiniMax —
   only the configured endpoint, model, and key differ. DeepSeek and MiMo are the
   first two configured providers.
@@ -46,10 +46,11 @@ Both decisions shape this daemon directly:
   call runs through the Nexus `CallProvider` effect plane, which the generated
   async runner awaits off the engine mailbox. No blocking IO inside an actor
   handler (`primary/skills/actor-systems.md`).
-- **API keys are env-resolved handles, never hardcoded.** The configuration and
-  registry carry only a key HANDLE (an environment-variable name); the secret
-  value is resolved at call time and held only for the duration of one call. The
-  agent never logs or persists the secret (`primary/skills/secrets.md`).
+- **API keys are daemon-resolved secret sources, never hardcoded.** The
+  configuration and registry carry only a typed source reference (`Environment`,
+  `Gopass`, or `File`); the secret value is resolved at call time and held only
+  for the duration of one call. The agent never logs or persists the secret
+  (`primary/skills/secrets.md`).
 - **Binary-only daemon startup.** `agent-daemon` takes exactly one argument: a
   binary rkyv configuration file. It never parses NOTA, configuration included.
   Provider configuration arrives via the binary startup seed or authenticated
