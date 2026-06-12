@@ -15,7 +15,7 @@
 //! this one OpenAI-compatible shape, so the same `OpenAiCompatibleProvider`
 //! serves every configured provider — only the endpoint, model, and key differ.
 
-use signal_agent::{ChatRole, OutputMode};
+use signal_agent::{ChatRole, OutputMode, ReasoningEffort, ThinkingMode};
 
 /// One fully-resolved provider call: the registry has already turned a
 /// `ProviderName` into an endpoint, a model, and the resolved secret API key.
@@ -31,6 +31,8 @@ pub struct ProviderCall {
     output_mode: OutputMode,
     temperature_milli: Option<u64>,
     maximum_output_tokens: Option<u64>,
+    reasoning_effort: Option<ReasoningEffort>,
+    thinking_mode: Option<ThinkingMode>,
 }
 
 /// The instruction the daemon folds into the system message for `OutputMode::Nota`:
@@ -50,6 +52,8 @@ impl ProviderCall {
         output_mode: OutputMode,
         temperature_milli: Option<u64>,
         maximum_output_tokens: Option<u64>,
+        reasoning_effort: Option<ReasoningEffort>,
+        thinking_mode: Option<ThinkingMode>,
     ) -> Self {
         Self {
             endpoint: endpoint.into(),
@@ -60,6 +64,8 @@ impl ProviderCall {
             output_mode,
             temperature_milli,
             maximum_output_tokens,
+            reasoning_effort,
+            thinking_mode,
         }
     }
 
@@ -97,6 +103,25 @@ impl ProviderCall {
 
     pub fn maximum_output_tokens(&self) -> Option<u64> {
         self.maximum_output_tokens
+    }
+
+    /// The OpenAI-compatible `reasoning_effort` string DeepSeek expects
+    /// (`low`/`medium`/`high`), derived from the typed `ReasoningEffort`.
+    pub fn reasoning_effort(&self) -> Option<&'static str> {
+        match self.reasoning_effort.as_ref()? {
+            ReasoningEffort::Low => Some("low"),
+            ReasoningEffort::Medium => Some("medium"),
+            ReasoningEffort::High => Some("high"),
+        }
+    }
+
+    /// The DeepSeek thinking toggle value (`enabled`/`disabled`) for the
+    /// top-level `thinking` object, derived from the typed `ThinkingMode`.
+    pub fn thinking_directive(&self) -> Option<&'static str> {
+        match self.thinking_mode.as_ref()? {
+            ThinkingMode::Enabled => Some("enabled"),
+            ThinkingMode::Disabled => Some("disabled"),
+        }
     }
 
     /// A copy of this call with the NOTA-output instruction folded into the system
@@ -342,6 +367,17 @@ mod live {
         temperature: Option<f64>,
         #[serde(skip_serializing_if = "Option::is_none")]
         max_tokens: Option<u64>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        reasoning_effort: Option<&'static str>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        thinking: Option<ThinkingDirective>,
+    }
+
+    /// DeepSeek's top-level `thinking` toggle object: `{"type": "enabled"}`.
+    #[derive(Debug, Serialize)]
+    struct ThinkingDirective {
+        #[serde(rename = "type")]
+        kind: &'static str,
     }
 
     impl ChatCompletionRequest {
@@ -364,6 +400,10 @@ mod live {
                 messages,
                 temperature: call.temperature(),
                 max_tokens: call.maximum_output_tokens(),
+                reasoning_effort: call.reasoning_effort(),
+                thinking: call
+                    .thinking_directive()
+                    .map(|kind| ThinkingDirective { kind }),
             }
         }
     }

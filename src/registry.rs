@@ -267,6 +267,8 @@ impl ProviderRegistry {
                 .maximum_output_tokens
                 .as_ref()
                 .map(|maximum| *maximum.payload()),
+            prompt.options.reasoning_effort,
+            prompt.options.thinking_mode,
         ))
     }
 

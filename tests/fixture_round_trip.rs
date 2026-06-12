@@ -88,6 +88,8 @@ fn guardian_prompt(provider: Option<&str>) -> Prompt {
             temperature_milli: Some(TemperatureMilli::new(0)),
             maximum_output_tokens: Some(MaximumOutputTokens::new(64)),
             output_mode: OutputMode::Nota,
+            reasoning_effort: None,
+            thinking_mode: None,
         },
     }
 }
