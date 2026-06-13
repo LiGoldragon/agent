@@ -179,7 +179,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -672,7 +672,7 @@ checksum = "6b947ae49db0d222b1dbc6b113ce7248a3fc3a6ca21b696717bfc000ba4484d8"
 [[package]]
 name = "meta-signal-agent"
 version = "0.2.0"
-source = "git+https://github.com/LiGoldragon/meta-signal-agent.git?branch=main#5bd85d47f0918047d5210b6ea8b06dcd8e94c18f"
+source = "git+https://github.com/LiGoldragon/meta-signal-agent.git?branch=main#0afa9857642040b821dd02235cc91c825400f498"
 dependencies = [
  "nota-next",
  "rkyv",
@@ -1033,7 +1033,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1096,7 +1096,7 @@ dependencies = [
 [[package]]
 name = "schema-rust-next"
 version = "0.5.3"
-source = "git+https://github.com/LiGoldragon/schema-rust-next.git?branch=main#7c15bc3fa3d07f4710acca16f14eef1aa68b02dd"
+source = "git+https://github.com/LiGoldragon/schema-rust-next.git?branch=main#00763d676d63395d45b5f8a81dbf9a2287574ca9"
 dependencies = [
  "prettyplease",
  "proc-macro2",
@@ -1176,7 +1176,7 @@ checksum = "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
 [[package]]
 name = "signal-agent"
 version = "0.3.0"
-source = "git+https://github.com/LiGoldragon/signal-agent.git?branch=main#3943e8a009a47ac6eb0e12fee629629afbea8719"
+source = "git+https://github.com/LiGoldragon/signal-agent.git?branch=main#3c88f388047645b7eb3a1f9cb778ae7eebb1a251"
 dependencies = [
  "nota-next",
  "rkyv",
@@ -1242,7 +1242,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "52d1cfed4120b4d927bf7c0f86d2087a4a7d6027c906d9f9d525a80573b9be51"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -1298,7 +1298,7 @@ dependencies = [
  "getrandom 0.4.2",
  "once_cell",
  "rustix",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
