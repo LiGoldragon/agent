@@ -101,9 +101,9 @@ the environment, binary frame to the daemon, NOTA reply on stdout.
   `RequestUnimplemented` until the streaming runner lands.
 - The redb (SEMA) durable projection of the provider registry — the registry is
   in-memory, re-supplied by meta `Configure` on restart.
-- The contract dependencies are pinned by `path` to the `agent-llm-call-rewrite`
-  worktrees until the operator integrates `signal-agent` / `meta-signal-agent`
-  to main; then the deps switch to `git`/`branch = main`.
+- The contract dependencies are consumed from `signal-agent` and
+  `meta-signal-agent` main. Contract source and generated wire nouns stay in
+  those repos; this daemon imports them and emits only its runtime planes.
 
 ## Code map
 

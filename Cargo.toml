@@ -34,21 +34,21 @@ nota-text = ["signal-agent/nota-text", "meta-signal-agent/nota-text"]
 live-provider = ["dep:reqwest", "dep:serde", "dep:serde_json"]
 
 [dependencies]
-nota-next        = { git = "https://github.com/LiGoldragon/nota-next.git", branch = "structural-forms-integration" }
+nota-next        = { git = "https://github.com/LiGoldragon/nota-next.git", branch = "main" }
 rkyv             = { version = "0.8", default-features = false, features = ["std", "bytecheck", "little_endian", "pointer_width_32", "unaligned"] }
 signal-frame     = { git = "https://github.com/LiGoldragon/signal-frame.git", branch = "main" }
 signal-agent      = { git = "https://github.com/LiGoldragon/signal-agent.git", branch = "main" }
 meta-signal-agent = { git = "https://github.com/LiGoldragon/meta-signal-agent.git", branch = "main" }
 thiserror        = "2"
 tokio            = { version = "1", features = ["fs", "io-util", "macros", "process", "rt-multi-thread", "time"] }
-triad-runtime    = { git = "https://github.com/LiGoldragon/triad-runtime.git", branch = "structural-forms-integration" }
+triad-runtime    = { git = "https://github.com/LiGoldragon/triad-runtime.git", branch = "main" }
 
 reqwest      = { version = "0.12", default-features = false, features = ["json", "rustls-tls"], optional = true }
 serde        = { version = "1", features = ["derive"], optional = true }
 serde_json   = { version = "1", optional = true }
 
 [build-dependencies]
-schema-rust-next = { git = "https://github.com/LiGoldragon/schema-rust-next.git", branch = "structural-forms-integration" }
+schema-rust-next = { git = "https://github.com/LiGoldragon/schema-rust-next.git", branch = "main" }
 
 [dev-dependencies]
 tempfile = "3"
