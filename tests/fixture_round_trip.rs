@@ -77,21 +77,21 @@ fn engine_with_deepseek() -> AgentEngine {
 }
 
 fn guardian_prompt(provider: Option<&str>) -> Prompt {
-    Prompt {
-        system: Some(SystemText::new("You judge intent.".to_owned())),
-        transcript: ChatTranscript::new(vec![ChatMessage::user(
+    Prompt::new(
+        Some(SystemText::new("You judge intent.".to_owned())),
+        ChatTranscript::new(vec![ChatMessage::user(
             "Reply exactly with this NOTA expression: (Verdict accepted)",
         )]),
-        options: PromptOptions {
-            model: Some(ModelName::new(DEEPSEEK_MODEL.to_owned())),
-            provider: provider.map(|name| ProviderName::new(name.to_owned())),
-            temperature_milli: Some(TemperatureMilli::new(0)),
-            maximum_output_tokens: Some(MaximumOutputTokens::new(64)),
-            output_mode: OutputMode::Nota,
-            reasoning_effort: None,
-            thinking_mode: None,
-        },
-    }
+        PromptOptions::new(
+            Some(ModelName::new(DEEPSEEK_MODEL.to_owned())),
+            provider.map(|name| ProviderName::new(name.to_owned())),
+            Some(TemperatureMilli::new(0)),
+            Some(MaximumOutputTokens::new(64)),
+            OutputMode::Nota,
+            None,
+            None,
+        ),
+    )
 }
 
 #[tokio::test]
@@ -105,7 +105,7 @@ async fn fixture_provider_completes_a_call_offline() {
     match output {
         Output::Completed(completion) => {
             // The fixture returns a valid NOTA verdict; the NOTA path validates it.
-            assert!(completion.text.payload().contains("Verdict"));
+            assert!(completion.completion_text.payload().contains("Verdict"));
             assert_eq!(completion.stop_reason.payload(), "stop");
         }
         other => panic!("expected a completion, got {other:?}"),
@@ -277,7 +277,7 @@ async fn live_deepseek_flash_returns_valid_nota_with_gopass_key() {
         .await;
     match output {
         Output::Completed(completion) => {
-            let text = completion.text.payload();
+            let text = completion.completion_text.payload();
             Document::parse(text).expect("live DeepSeek completion must be valid NOTA");
             assert!(
                 text.contains("Verdict"),

@@ -222,19 +222,18 @@ impl ProviderRegistry {
         prompt: &Prompt,
         keys: &(dyn KeySource + Send + Sync),
     ) -> Result<ProviderCall, ResolveError> {
+        let options = prompt.prompt_options();
         let provider_name = prompt
-            .options
-            .provider
-            .as_ref()
+            .prompt_options()
+            .provider()
             .map(|provider| provider.payload().clone())
             .or_else(|| self.default_provider.clone())
             .ok_or(ResolveError::NoProviderConfigured)?;
         let entry = self
             .entry(&provider_name)
             .ok_or_else(|| ResolveError::ProviderUnknown(provider_name.clone()))?;
-        let model = prompt
-            .options
-            .model
+        let model = options
+            .model()
             .as_ref()
             .map(|model| model.payload().clone())
             .unwrap_or_else(|| entry.default_model().to_owned());
@@ -246,29 +245,22 @@ impl ProviderRegistry {
             entry.endpoint().to_owned(),
             model,
             api_key,
+            prompt.system().map(|system| system.payload().clone()),
             prompt
-                .system
-                .as_ref()
-                .map(|system| system.payload().clone()),
-            prompt
-                .transcript
+                .chat_transcript()
                 .payload()
                 .iter()
                 .map(Self::project_message)
                 .collect(),
-            prompt.options.output_mode,
-            prompt
-                .options
-                .temperature_milli
-                .as_ref()
+            options.output_mode(),
+            options
+                .temperature_milli()
                 .map(|temperature| *temperature.payload()),
-            prompt
-                .options
-                .maximum_output_tokens
-                .as_ref()
+            options
+                .maximum_output_tokens()
                 .map(|maximum| *maximum.payload()),
-            prompt.options.reasoning_effort,
-            prompt.options.thinking_mode,
+            options.reasoning_effort().copied(),
+            options.thinking_mode().copied(),
         ))
     }
 

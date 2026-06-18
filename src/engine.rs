@@ -198,12 +198,12 @@ impl AgentEngine {
 
     fn completion(completion: ProviderCompletion) -> Completion {
         Completion {
-            text: CompletionText::new(completion.text),
+            completion_text: CompletionText::new(completion.text),
             stop_reason: StopReasonText::new(completion.stop_reason),
-            usage: TokenUsage {
-                prompt_tokens: completion.prompt_tokens.map(PromptTokenCount::new),
-                completion_tokens: completion.completion_tokens.map(CompletionTokenCount::new),
-            },
+            token_usage: TokenUsage::new(
+                completion.prompt_tokens.map(PromptTokenCount::new),
+                completion.completion_tokens.map(CompletionTokenCount::new),
+            ),
         }
     }
 
