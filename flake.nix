@@ -23,10 +23,14 @@
       system:
       let
         pkgs = import nixpkgs { inherit system; };
-        toolchain = fenix.packages.${system}.fromToolchainFile {
-          file = ./rust-toolchain.toml;
-          sha256 = "sha256-mvUGEOHYJpn3ikC5hckneuGixaC+yGrkMM/liDIDgoU=";
-        };
+        toolchain = fenix.packages.${system}.complete.withComponents [
+          "cargo"
+          "rustc"
+          "rustfmt"
+          "clippy"
+          "rust-analyzer"
+          "rust-src"
+        ];
         craneLib = (crane.mkLib pkgs).overrideToolchain toolchain;
         source = pkgs.lib.cleanSource ./.;
         commonArguments = {
