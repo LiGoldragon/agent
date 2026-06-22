@@ -670,7 +670,7 @@ checksum = "88904434abc2901f197fe8cc55f0445e7ded921dba5911dad2e2b39b48e663c4"
 [[package]]
 name = "meta-signal-agent"
 version = "0.2.0"
-source = "git+https://github.com/LiGoldragon/meta-signal-agent.git?branch=main#58aa4f729ce0d89728d033267010ae373d2af9d1"
+source = "git+https://github.com/LiGoldragon/meta-signal-agent.git?branch=main#65ec99f3a2035d5410c411e26e7b65325b6235e1"
 dependencies = [
  "nota-next",
  "rkyv",
@@ -712,8 +712,8 @@ dependencies = [
 
 [[package]]
 name = "nota-next"
-version = "0.5.0"
-source = "git+https://github.com/LiGoldragon/nota-next.git?branch=main#c43d04a159e90314a0094b61ace66053371cc247"
+version = "0.5.1"
+source = "git+https://github.com/LiGoldragon/nota-next.git?branch=main#4642807e40306a382acbcdcb7c61b5802c7e22f5"
 dependencies = [
  "nota-next-derive",
  "rkyv",
@@ -722,7 +722,7 @@ dependencies = [
 [[package]]
 name = "nota-next-derive"
 version = "0.3.0"
-source = "git+https://github.com/LiGoldragon/nota-next.git?branch=main#c43d04a159e90314a0094b61ace66053371cc247"
+source = "git+https://github.com/LiGoldragon/nota-next.git?branch=main#4642807e40306a382acbcdcb7c61b5802c7e22f5"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1084,7 +1084,7 @@ checksum = "9774ba4a74de5f7b1c1451ed6cd5285a32eddb5cccb8cc655a4e50009e06477f"
 [[package]]
 name = "schema-cc"
 version = "0.1.0"
-source = "git+https://github.com/LiGoldragon/schema-next.git?branch=main#4b7e830a7001708737a617bd8eedac8002cc1fc6"
+source = "git+https://github.com/LiGoldragon/schema-next.git?branch=main#0fc7970aaeb1a031f78d1a7ef3201f2004b6c0c3"
 dependencies = [
  "nota-next",
  "prettyplease",
@@ -1097,7 +1097,7 @@ dependencies = [
 [[package]]
 name = "schema-next"
 version = "0.2.0"
-source = "git+https://github.com/LiGoldragon/schema-next.git?branch=main#4b7e830a7001708737a617bd8eedac8002cc1fc6"
+source = "git+https://github.com/LiGoldragon/schema-next.git?branch=main#0fc7970aaeb1a031f78d1a7ef3201f2004b6c0c3"
 dependencies = [
  "blake3",
  "nota-next",
@@ -1109,7 +1109,7 @@ dependencies = [
 [[package]]
 name = "schema-rust-next"
 version = "0.5.3"
-source = "git+https://github.com/LiGoldragon/schema-rust-next.git?branch=main#90d853c33ade57cfafca5942dd0790a3302a605f"
+source = "git+https://github.com/LiGoldragon/schema-rust-next.git?branch=main#e4ac3baf37121b8d7516bc5cdc6bdf026aa5b282"
 dependencies = [
  "prettyplease",
  "proc-macro2",
@@ -1189,7 +1189,7 @@ checksum = "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
 [[package]]
 name = "signal-agent"
 version = "0.3.0"
-source = "git+https://github.com/LiGoldragon/signal-agent.git?branch=main#b1ba3ce00867749080e8ee7e68dbe26b8c6b15cb"
+source = "git+https://github.com/LiGoldragon/signal-agent.git?branch=main#8b395f3c9fb30e892bb6ba21ae67383ce5f80a51"
 dependencies = [
  "nota-next",
  "rkyv",
