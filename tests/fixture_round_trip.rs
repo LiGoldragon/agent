@@ -14,7 +14,7 @@ use agent::registry::{
 };
 use agent::{AgentEngine, FixtureProvider};
 #[cfg(feature = "live-provider")]
-use nota_next::Document;
+use nota::Document;
 use signal_agent::{
     CallRejectionReason, ChatMessage, ChatTranscript, Input, MaximumOutputTokens, ModelName,
     Output, OutputMode, Prompt, PromptOptions, ProviderName, SystemText, TemperatureMilli,

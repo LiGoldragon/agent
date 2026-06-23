@@ -8,7 +8,7 @@
 //! It is a schema-derived triad component on the emitted daemon runtime. The
 //! two plane schemas (`schema/nexus.schema`, `schema/sema.schema`) plus the
 //! daemon module generate the checked-in modules under `src/schema/` through
-//! `schema-rust-next`; the working tier's `Input`/`Output` come from the
+//! `schema-rust`; the working tier's `Input`/`Output` come from the
 //! dependency contract `signal-agent`. The hand-written code here is the thin
 //! runtime around those generated interfaces.
 //!

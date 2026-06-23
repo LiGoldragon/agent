@@ -3,7 +3,7 @@
 //! The uniform daemon skeleton (argv parsing, the async working
 //! decode -> execute -> encode spine, the two-tier listener bind, and the
 //! `ExitReport` entry) is EMITTED into `src/schema/daemon.rs` by
-//! schema-rust-next's daemon emitter, driven by the two-tier `NexusDaemonShape`
+//! schema-rust's daemon emitter, driven by the two-tier `NexusDaemonShape`
 //! in `build.rs`. The agent fills only the escape hatches through `impl
 //! ComponentDaemon for AgentDaemon`: how to load its `Configuration`, how to
 //! build its `AgentEngine` (`build_runtime`), how one ordinary `Input` becomes

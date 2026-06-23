@@ -13,7 +13,7 @@
 //! the only place the daemon touches the network, and it does so off the engine
 //! mailbox through the async effect seam, never blocking a handler.
 
-use nota_next::Document;
+use nota::Document;
 use signal_agent::{
     CallRejection, CallRejectionReason, Completion, CompletionText, CompletionTokenCount,
     OperationKind, Output, OutputMode, PromptTokenCount, RejectionDetail, RequestUnimplemented,

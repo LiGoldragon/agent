@@ -13,7 +13,7 @@ use agent::{
     registry::SecretSource as RuntimeSecretSource,
 };
 use meta_signal_agent::SecretSource as ConfigurationWriterSecretSource;
-use nota_next::{NotaDecode, NotaDecodeError, NotaEncode, NotaSource};
+use nota::{NotaDecode, NotaDecodeError, NotaEncode, NotaSource};
 use thiserror::Error;
 use triad_runtime::{ArgumentError, ComponentArgument, ComponentCommand};
 
