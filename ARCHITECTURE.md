@@ -8,7 +8,7 @@ to a configured provider's OpenAI-compatible `/chat/completions` endpoint.
 It cites `primary/skills/component-triad.md` and states only the
 component-specific shape below; the universal invariants live in that skill.
 
-## Scope
+## Direction
 
 Per psyche Spirit `iucr` / `f8k7`: an LLM-API caller, not an agent harness.
 Harness backends are deferred. Providers are configuration: a generic
