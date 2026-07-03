@@ -632,8 +632,8 @@ checksum = "88904434abc2901f197fe8cc55f0445e7ded921dba5911dad2e2b39b48e663c4"
 
 [[package]]
 name = "meta-signal-agent"
-version = "0.2.0"
-source = "git+https://github.com/LiGoldragon/meta-signal-agent.git?branch=main#d7378752368bb2fd108e49b497b3e5ab7298dd3a"
+version = "0.2.1"
+source = "git+https://github.com/LiGoldragon/meta-signal-agent.git?branch=main#1f615ebae8b3aeb5caae1319e531696beaa859c6"
 dependencies = [
  "nota",
  "rkyv",
@@ -676,7 +676,7 @@ dependencies = [
 [[package]]
 name = "nota"
 version = "0.5.1"
-source = "git+https://github.com/LiGoldragon/nota-next.git?branch=main#96e64bcdbe531eb33a900eb3abbc58a095e01f76"
+source = "git+https://github.com/LiGoldragon/nota-next.git?branch=main#bea7e2840ac2cf3e384f07b5c10eeb0890cead25"
 dependencies = [
  "nota-derive",
  "rkyv",
@@ -685,7 +685,7 @@ dependencies = [
 [[package]]
 name = "nota-derive"
 version = "0.3.0"
-source = "git+https://github.com/LiGoldragon/nota-next.git?branch=main#96e64bcdbe531eb33a900eb3abbc58a095e01f76"
+source = "git+https://github.com/LiGoldragon/nota-next.git?branch=main#bea7e2840ac2cf3e384f07b5c10eeb0890cead25"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1047,7 +1047,7 @@ checksum = "9774ba4a74de5f7b1c1451ed6cd5285a32eddb5cccb8cc655a4e50009e06477f"
 [[package]]
 name = "schema"
 version = "0.2.0"
-source = "git+https://github.com/LiGoldragon/schema-next.git?branch=main#b3d9826a04d09d13007c72dfbb47fff90540d7d4"
+source = "git+https://github.com/LiGoldragon/schema-next.git?branch=main#9af2c546f10c9aec5fd6669592aed32f72077df2"
 dependencies = [
  "blake3",
  "nota",
@@ -1059,7 +1059,7 @@ dependencies = [
 [[package]]
 name = "schema-cc"
 version = "0.1.0"
-source = "git+https://github.com/LiGoldragon/schema-next.git?branch=main#b3d9826a04d09d13007c72dfbb47fff90540d7d4"
+source = "git+https://github.com/LiGoldragon/schema-next.git?branch=main#9af2c546f10c9aec5fd6669592aed32f72077df2"
 dependencies = [
  "nota",
  "prettyplease",
@@ -1072,14 +1072,16 @@ dependencies = [
 [[package]]
 name = "schema-rust"
 version = "0.5.3"
-source = "git+https://github.com/LiGoldragon/schema-rust-next.git?branch=main#06eec0d13e84184f2d721e53b9619a049023a4a3"
+source = "git+https://github.com/LiGoldragon/schema-rust-next.git?branch=main#6218fb64f98c909de1eaa5c35744bd48a97a6f87"
 dependencies = [
+ "nota",
  "prettyplease",
  "proc-macro2",
  "quote",
  "schema",
  "syn",
  "thiserror",
+ "triad-runtime",
 ]
 
 [[package]]
@@ -1157,8 +1159,8 @@ dependencies = [
 
 [[package]]
 name = "signal-frame"
-version = "0.2.1"
-source = "git+https://github.com/LiGoldragon/signal-frame.git?branch=main#d0dd5c0b66a90c1af72d45920e31c2b3049437f9"
+version = "0.3.0"
+source = "git+https://github.com/LiGoldragon/signal-frame.git?branch=main#0027ea3cef353b1c168ca6862e40c6077a853642"
 dependencies = [
  "nota",
  "paste",
@@ -1170,7 +1172,7 @@ dependencies = [
 [[package]]
 name = "signal-frame-macros"
 version = "0.1.1"
-source = "git+https://github.com/LiGoldragon/signal-frame.git?branch=main#d0dd5c0b66a90c1af72d45920e31c2b3049437f9"
+source = "git+https://github.com/LiGoldragon/signal-frame.git?branch=main#0027ea3cef353b1c168ca6862e40c6077a853642"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1433,7 +1435,7 @@ dependencies = [
 [[package]]
 name = "triad-runtime"
 version = "0.6.1"
-source = "git+https://github.com/LiGoldragon/triad-runtime.git?branch=main#60e0ed7c753d35561458586ff7d870dcadf47ea5"
+source = "git+https://github.com/LiGoldragon/triad-runtime.git?branch=main#3d3207461bcbd39dd2505d0bb957b6fec30c98d9"
 dependencies = [
  "kameo",
  "rkyv",

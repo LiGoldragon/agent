@@ -15,15 +15,27 @@ use agent::registry::{
 use agent::{AgentEngine, FixtureProvider};
 #[cfg(feature = "live-provider")]
 use nota::Document;
+#[cfg(feature = "live-provider")]
+use serde_json::Value;
 use signal_agent::{
     CallRejectionReason, ChatMessage, ChatTranscript, Input, MaximumOutputTokens, ModelName,
     Output, OutputMode, Prompt, PromptOptions, ProviderName, SystemText, TemperatureMilli,
+};
+#[cfg(feature = "live-provider")]
+use std::{
+    io::{Read, Write},
+    net::TcpListener,
+    thread,
 };
 
 const DEEPSEEK_PROVIDER: &str = "deepseek";
 const DEEPSEEK_ENDPOINT: &str = "https://api.deepseek.com/v1";
 const DEEPSEEK_MODEL: &str = "deepseek-v4-flash";
 const DEEPSEEK_KEY_HANDLE: &str = "DEEPSEEK_API_KEY";
+#[cfg(feature = "live-provider")]
+const LOCAL_OPENAI_PROVIDER: &str = "local-openai";
+#[cfg(feature = "live-provider")]
+const LOCAL_OPENAI_MODEL: &str = "gpt-5.5";
 #[cfg(feature = "live-provider")]
 const DEEPSEEK_GOPASS_PATH: &str = "platform.deepseek.com/api-key";
 
@@ -85,6 +97,23 @@ fn guardian_prompt(provider: Option<&str>) -> Prompt {
         PromptOptions::new(
             Some(ModelName::new(DEEPSEEK_MODEL.to_owned())),
             provider.map(|name| ProviderName::new(name.to_owned())),
+            Some(TemperatureMilli::new(0)),
+            Some(MaximumOutputTokens::new(64)),
+            OutputMode::Nota,
+            None,
+            None,
+        ),
+    )
+}
+
+#[cfg(feature = "live-provider")]
+fn provider_prompt(provider: &str, model: &str) -> Prompt {
+    Prompt::new(
+        Some(SystemText::new("You classify one record.".to_owned())),
+        ChatTranscript::new(vec![ChatMessage::user("Return (Verdict accepted)")]),
+        PromptOptions::new(
+            Some(ModelName::new(model.to_owned())),
+            Some(ProviderName::new(provider.to_owned())),
             Some(TemperatureMilli::new(0)),
             Some(MaximumOutputTokens::new(64)),
             OutputMode::Nota,
@@ -239,6 +268,151 @@ async fn system_key_source_reads_secret_file_without_trailing_newline() {
         .await
         .expect("resolve file secret");
     assert_eq!(key.as_str(), "file-secret");
+}
+
+#[cfg(feature = "live-provider")]
+struct CapturedHttpRequest {
+    request_line: String,
+    authorization: Option<String>,
+    body: Value,
+}
+
+#[cfg(feature = "live-provider")]
+struct CapturingOpenAiServer {
+    endpoint: String,
+    thread: thread::JoinHandle<CapturedHttpRequest>,
+}
+
+#[cfg(feature = "live-provider")]
+impl CapturingOpenAiServer {
+    fn spawn() -> Self {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind local capture server");
+        let endpoint = format!("http://{}/v1", listener.local_addr().expect("local addr"));
+        let thread = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().expect("accept provider request");
+            let mut bytes = Vec::new();
+            let mut buffer = [0_u8; 4096];
+            let header_end = loop {
+                let count = stream.read(&mut buffer).expect("read request");
+                assert!(count > 0, "provider closed before headers");
+                bytes.extend_from_slice(&buffer[..count]);
+                if let Some(index) = bytes.windows(4).position(|window| window == b"\r\n\r\n") {
+                    break index + 4;
+                }
+            };
+            let headers = String::from_utf8_lossy(&bytes[..header_end]).to_string();
+            let content_length = headers
+                .lines()
+                .find_map(|line| {
+                    line.strip_prefix("content-length: ")
+                        .or_else(|| line.strip_prefix("Content-Length: "))
+                })
+                .and_then(|value| value.trim().parse::<usize>().ok())
+                .expect("content-length header");
+            while bytes.len() < header_end + content_length {
+                let count = stream.read(&mut buffer).expect("read body");
+                assert!(count > 0, "provider closed before body");
+                bytes.extend_from_slice(&buffer[..count]);
+            }
+            let body_slice = &bytes[header_end..header_end + content_length];
+            let body: Value = serde_json::from_slice(body_slice).expect("request json");
+            let authorization = headers.lines().find_map(|line| {
+                line.strip_prefix("authorization: ")
+                    .or_else(|| line.strip_prefix("Authorization: "))
+                    .map(ToOwned::to_owned)
+            });
+            let request_line = headers.lines().next().unwrap_or_default().to_owned();
+            let response_body = "{\"choices\":[{\"message\":{\"content\":\"(Verdict accepted)\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":1,\"completion_tokens\":1}}";
+            let response = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
+                response_body.len(),
+                response_body
+            );
+            stream
+                .write_all(response.as_bytes())
+                .expect("write response");
+            CapturedHttpRequest {
+                request_line,
+                authorization,
+                body,
+            }
+        });
+        Self { endpoint, thread }
+    }
+
+    fn endpoint(&self) -> &str {
+        &self.endpoint
+    }
+
+    fn join(self) -> CapturedHttpRequest {
+        self.thread.join().expect("capture thread joins")
+    }
+}
+
+#[cfg(feature = "live-provider")]
+#[tokio::test]
+async fn local_openai_compatible_provider_omits_authorization_for_no_secret() {
+    let server = CapturingOpenAiServer::spawn();
+    let mut registry = ProviderRegistry::new();
+    registry.configure(ProviderEntry::new(
+        LOCAL_OPENAI_PROVIDER,
+        server.endpoint(),
+        LOCAL_OPENAI_MODEL,
+        SecretSource::no_secret(),
+    ));
+    let call = registry
+        .resolve(
+            &provider_prompt(LOCAL_OPENAI_PROVIDER, LOCAL_OPENAI_MODEL),
+            &LiteralKeySource,
+        )
+        .await
+        .expect("resolve local provider");
+    let completion = agent::provider::OpenAiCompatibleProvider::new()
+        .complete(call)
+        .await
+        .expect("provider completion");
+    assert_eq!(completion.text, "(Verdict accepted)");
+
+    let captured = server.join();
+    assert_eq!(captured.request_line, "POST /v1/chat/completions HTTP/1.1");
+    assert_eq!(captured.authorization, None);
+    assert_eq!(captured.body["model"], LOCAL_OPENAI_MODEL);
+    assert!(captured.body.get("tools").is_none());
+    assert!(captured.body.get("tool_choice").is_none());
+    assert_eq!(captured.body["messages"][0]["role"], "system");
+    assert_eq!(captured.body["messages"][1]["role"], "user");
+}
+
+#[cfg(feature = "live-provider")]
+#[tokio::test]
+async fn local_openai_compatible_provider_sends_configured_bearer_header() {
+    let server = CapturingOpenAiServer::spawn();
+    let mut registry = ProviderRegistry::new();
+    registry.configure(ProviderEntry::new(
+        LOCAL_OPENAI_PROVIDER,
+        server.endpoint(),
+        LOCAL_OPENAI_MODEL,
+        SecretSource::environment("LOCAL_OPENAI_API_KEY"),
+    ));
+    let call = registry
+        .resolve(
+            &provider_prompt(LOCAL_OPENAI_PROVIDER, LOCAL_OPENAI_MODEL),
+            &LiteralKeySource,
+        )
+        .await
+        .expect("resolve local provider");
+    let completion = agent::provider::OpenAiCompatibleProvider::new()
+        .complete(call)
+        .await
+        .expect("provider completion");
+    assert_eq!(completion.text, "(Verdict accepted)");
+
+    let captured = server.join();
+    assert_eq!(captured.request_line, "POST /v1/chat/completions HTTP/1.1");
+    assert_eq!(captured.authorization.as_deref(), Some("Bearer test-key"));
+    assert_eq!(captured.body["model"], LOCAL_OPENAI_MODEL);
+    assert!(captured.body.get("tools").is_none());
+    assert!(captured.body.get("tool_choice").is_none());
 }
 
 /// Real-network test, gated on a live gopass key. Skips silently when the key is

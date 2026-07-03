@@ -4,8 +4,8 @@
 //! `ProviderConfiguration` carries: name, endpoint, default model, and a typed
 //! secret-source reference. The registry resolves a `ProviderName` plus a
 //! `Prompt` into a fully-resolved `ProviderCall`, asking the daemon-owned
-//! `KeySource` to resolve the configured backend. The secret value never lives
-//! in the registry, only the source reference.
+//! `KeySource` to resolve configured secret-bearing backends. The secret value
+//! never lives in the registry, only the source reference.
 
 use std::path::Path;
 
@@ -13,7 +13,7 @@ use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
 use signal_agent::{ChatMessage, Prompt};
 use thiserror::Error;
 
-use crate::provider::{ProviderApiKey, ProviderCall, ProviderMessage};
+use crate::provider::{ProviderApiKey, ProviderAuthorization, ProviderCall, ProviderMessage};
 
 /// One configured provider: the OpenAI-compatible facts plus the secret source.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -57,12 +57,13 @@ impl ProviderEntry {
 }
 
 /// A typed reference to where a provider API key lives. This is configuration,
-/// not a secret value.
+/// not a secret value. `NoSecret` sends no Authorization header.
 #[derive(Archive, RkyvSerialize, RkyvDeserialize, Clone, Debug, PartialEq, Eq)]
 pub enum SecretSource {
     Environment(EnvironmentVariable),
     Gopass(GopassPath),
     File(SecretFilePath),
+    NoSecret,
 }
 
 impl SecretSource {
@@ -78,12 +79,21 @@ impl SecretSource {
         Self::File(SecretFilePath::new(path))
     }
 
+    pub fn no_secret() -> Self {
+        Self::NoSecret
+    }
+
     fn description(&self) -> String {
         match self {
             Self::Environment(variable) => format!("environment:{}", variable.as_str()),
             Self::Gopass(path) => format!("gopass:{}", path.as_str()),
             Self::File(path) => format!("file:{}", path.as_str()),
+            Self::NoSecret => "no-secret".to_owned(),
         }
+    }
+
+    fn requires_secret_resolution(&self) -> bool {
+        !matches!(self, Self::NoSecret)
     }
 }
 
@@ -99,6 +109,7 @@ impl From<meta_signal_agent::SecretSource> for SecretSource {
             meta_signal_agent::SecretSource::File(secret) => {
                 Self::file(secret.into_payload().into_payload())
             }
+            meta_signal_agent::SecretSource::NoSecret => Self::no_secret(),
         }
     }
 }
@@ -237,14 +248,19 @@ impl ProviderRegistry {
             .as_ref()
             .map(|model| model.payload().clone())
             .unwrap_or_else(|| entry.default_model().to_owned());
-        let api_key = keys
-            .resolve(entry.secret_source().clone())
-            .await
-            .map_err(ResolveError::SecretUnavailable)?;
+        let authorization = if entry.secret_source().requires_secret_resolution() {
+            ProviderAuthorization::bearer(
+                keys.resolve(entry.secret_source().clone())
+                    .await
+                    .map_err(ResolveError::SecretUnavailable)?,
+            )
+        } else {
+            ProviderAuthorization::none()
+        };
         Ok(ProviderCall::new(
             entry.endpoint().to_owned(),
             model,
-            api_key,
+            authorization,
             prompt.system().map(|system| system.payload().clone()),
             prompt
                 .chat_transcript()
@@ -316,6 +332,7 @@ impl KeySource for SystemKeySource {
                 }
                 SecretSource::Gopass(path) => Self::resolve_gopass(path).await?,
                 SecretSource::File(path) => Self::resolve_file(path).await?,
+                SecretSource::NoSecret => return Ok(ProviderApiKey::new("")),
             };
             let api_key = ProviderApiKey::from_secret_output(value);
             if api_key.is_empty() {

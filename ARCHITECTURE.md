@@ -59,10 +59,12 @@ ProviderCompletionFuture`). Two implementations:
 - `FixtureProvider` — deterministic, no network, no key. Lets the daemon build
   and the round-trip test run offline. The default build uses it.
 - `OpenAiCompatibleProvider` (feature `live-provider`) — the reqwest-backed
-  call. One client serves every configured provider; only endpoint/model/key
-  differ. It posts the OpenAI chat-completions body (system + transcript,
-  `temperature`, `max_tokens`, `response_format: json_object` when the prompt's
-  `OutputMode` is `JsonObject`) with the resolved key as a bearer token.
+  call. One client serves every configured provider; only endpoint, model, and
+  authorization differ. It posts the OpenAI chat-completions body (system +
+  transcript, `temperature`, `max_tokens`, `response_format: json_object` when
+  the prompt's `OutputMode` is `JsonObject`) with a bearer token only when the
+  resolved authorization carries one. `NoSecret` sends no Authorization header
+  for trusted loopback OpenAI-compatible servers.
 
 ## The provider registry — policy state
 
@@ -71,8 +73,11 @@ secret source) plus a default. `resolve(prompt)` picks the provider (prompt's
 named provider, else the default), the model (prompt's, else the provider
 default), and resolves the secret source through a `KeySource`. The production
 `KeySource` is `SystemKeySource`, which supports `Environment`, `Gopass`, and
-`File` backends. Tests inject a literal key source so a fixture call needs no
-process environment.
+`File` backends. The `NoSecret` source bypasses key resolution and is intended
+for a local OpenAI-compatible server such as `http://127.0.0.1:18080/v1` with
+model `gpt-5.5`; if that local server is started with its own API-key gate, use
+`Environment` or `File` instead. Tests inject a literal key source so a fixture
+call needs no process environment.
 
 The registry is configured through the meta tier (`handle_meta_connection`
 decodes `meta_signal_agent::Input`, mutates the registry) and seeded at startup

@@ -6,10 +6,11 @@ returning a `Completion`. It is the LLM-call substrate the gated Spirit guardian
 uses to judge intent — an LLM-API caller, not an agent harness (psyche scope).
 
 A provider is a generic OpenAI-compatible API (endpoint + model + typed
-secret-source reference); adding DeepSeek, MiMo, Kimi, GLM, or MiniMax is
-configuration through `meta-signal-agent`, never code. API keys are resolved by
-the daemon from configured backends such as gopass — never hardcoded, never
-logged.
+secret-source reference); adding DeepSeek, MiMo, Kimi, GLM, MiniMax, or a local
+subscription-backed server is configuration through `meta-signal-agent`, never
+code. API keys are resolved by the daemon from configured backends such as
+gopass, or `NoSecret` sends no Authorization header for a trusted loopback
+server. Secrets are never hardcoded and never logged.
 
 - `agent-daemon` — the long-lived process. One binary rkyv configuration
   argument; binds an ordinary (working) socket and a `0o600` meta socket.

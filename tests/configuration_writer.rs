@@ -69,3 +69,40 @@ fn configuration_writer_prebuilds_binary_archive_for_daemon_startup() {
         agent::registry::SecretSource::Gopass(_)
     ));
 }
+
+#[test]
+fn configuration_writer_accepts_local_provider_without_secret() {
+    let sandbox = ConfigurationWriterSandbox::new();
+    let request = format!(
+        "(AgentConfigurationWriteRequest ({} {} 384 {} [(ProviderSeed (local-openai http://127.0.0.1:18080/v1 gpt-5.5 NoSecret))] {}))",
+        sandbox.ordinary_socket_path.display(),
+        sandbox.meta_socket_path.display(),
+        sandbox.database_path.display(),
+        sandbox.output_path.display()
+    );
+    let output = Command::new(env!("CARGO_BIN_EXE_agent-write-configuration"))
+        .arg(request)
+        .output()
+        .expect("run agent-write-configuration");
+    assert!(
+        output.status.success(),
+        "writer failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let configuration =
+        AgentDaemonConfiguration::from_binary_path(sandbox.output_path()).expect("read archive");
+    assert_eq!(configuration.bootstrap_providers()[0].name, "local-openai");
+    assert_eq!(
+        configuration.bootstrap_providers()[0].endpoint,
+        "http://127.0.0.1:18080/v1"
+    );
+    assert_eq!(
+        configuration.bootstrap_providers()[0].default_model,
+        "gpt-5.5"
+    );
+    assert!(matches!(
+        configuration.bootstrap_providers()[0].secret_source,
+        agent::registry::SecretSource::NoSecret
+    ));
+}

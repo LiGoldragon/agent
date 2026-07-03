@@ -64,7 +64,7 @@ impl ContractSchemaDependencies {
             meta_signal: DependencySchema::from_cargo_metadata(
                 "meta-signal-agent",
                 "meta-signal-agent",
-                "0.2.0",
+                "0.2.1",
             )
             .expect("read meta-signal-agent schema metadata"),
         }

@@ -2,8 +2,8 @@
 //! `/chat/completions` request.
 //!
 //! A `Provider` is the async effect behind the Nexus `CallProvider` command. The
-//! daemon resolves a `ProviderCall` (endpoint + model + resolved API key + the
-//! chat messages) from the registry, then asks the provider to `complete` it.
+//! daemon resolves a `ProviderCall` (endpoint + model + resolved authorization +
+//! the chat messages) from the registry, then asks the provider to `complete` it.
 //! Two implementations:
 //!
 //! - `FixtureProvider` — a deterministic mock that needs no network and no API
@@ -13,19 +13,20 @@
 //!
 //! Adding DeepSeek, MiMo, Kimi, GLM, or MiniMax is configuration: they all speak
 //! this one OpenAI-compatible shape, so the same `OpenAiCompatibleProvider`
-//! serves every configured provider — only the endpoint, model, and key differ.
+//! serves every configured provider — only the endpoint, model, and
+//! authorization differ.
 
 use signal_agent::{ChatRole, OutputMode, ReasoningEffort, ThinkingMode};
 
 /// One fully-resolved provider call: the registry has already turned a
-/// `ProviderName` into an endpoint, a model, and the resolved secret API key.
-/// The secret lives only inside this value while the call is in flight; it is
-/// never stored, logged, or sent anywhere but the provider's TLS endpoint.
+/// `ProviderName` into an endpoint, a model, and the resolved authorization.
+/// Bearer secrets live only inside this value while the call is in flight; they
+/// are never stored, logged, or sent anywhere but the provider endpoint.
 #[derive(Debug, Clone)]
 pub struct ProviderCall {
     endpoint: String,
     model: String,
-    api_key: ProviderApiKey,
+    authorization: ProviderAuthorization,
     system: Option<String>,
     messages: Vec<ProviderMessage>,
     output_mode: OutputMode,
@@ -46,7 +47,7 @@ impl ProviderCall {
     pub fn new(
         endpoint: impl Into<String>,
         model: impl Into<String>,
-        api_key: ProviderApiKey,
+        authorization: ProviderAuthorization,
         system: Option<String>,
         messages: Vec<ProviderMessage>,
         output_mode: OutputMode,
@@ -58,7 +59,7 @@ impl ProviderCall {
         Self {
             endpoint: endpoint.into(),
             model: model.into(),
-            api_key,
+            authorization,
             system,
             messages,
             output_mode,
@@ -77,8 +78,8 @@ impl ProviderCall {
         &self.model
     }
 
-    pub fn api_key(&self) -> &ProviderApiKey {
-        &self.api_key
+    pub fn authorization(&self) -> &ProviderAuthorization {
+        &self.authorization
     }
 
     pub fn system(&self) -> Option<&str> {
@@ -184,6 +185,40 @@ impl ProviderApiKey {
 impl std::fmt::Debug for ProviderApiKey {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter.write_str("ProviderApiKey(<redacted>)")
+    }
+}
+
+/// The outbound provider authentication shape. `None` is explicit so trusted
+/// local OpenAI-compatible servers can run without a bearer header.
+#[derive(Clone)]
+pub enum ProviderAuthorization {
+    Bearer(ProviderApiKey),
+    None,
+}
+
+impl ProviderAuthorization {
+    pub fn bearer(value: ProviderApiKey) -> Self {
+        Self::Bearer(value)
+    }
+
+    pub fn none() -> Self {
+        Self::None
+    }
+
+    pub fn bearer_token(&self) -> Option<&ProviderApiKey> {
+        match self {
+            Self::Bearer(token) => Some(token),
+            Self::None => None,
+        }
+    }
+}
+
+impl std::fmt::Debug for ProviderAuthorization {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Bearer(_) => formatter.write_str("ProviderAuthorization::Bearer(<redacted>)"),
+            Self::None => formatter.write_str("ProviderAuthorization::None"),
+        }
     }
 }
 
@@ -301,9 +336,10 @@ mod live {
     use serde::{Deserialize, Serialize};
 
     /// The reqwest-backed OpenAI-compatible provider. One client serves every
-    /// configured provider — DeepSeek, MiMo, Kimi, GLM, MiniMax — because they
-    /// all expose the same `/chat/completions` shape; only the endpoint, model,
-    /// and key (carried per-call in `ProviderCall`) differ.
+    /// configured provider — DeepSeek, MiMo, Kimi, GLM, MiniMax, or a local
+    /// subscription-backed server — because they all expose the same
+    /// `/chat/completions` shape; only the endpoint, model, and authorization
+    /// (carried per-call in `ProviderCall`) differ.
     #[derive(Debug, Clone)]
     pub struct OpenAiCompatibleProvider {
         client: reqwest::Client,
@@ -330,11 +366,11 @@ mod live {
         ) -> Result<ProviderCompletion, ProviderFailure> {
             let request = ChatCompletionRequest::from_call(&call);
             let url = format!("{}/chat/completions", call.endpoint().trim_end_matches('/'));
-            let response = self
-                .client
-                .post(url)
-                .bearer_auth(call.api_key().as_str())
-                .json(&request)
+            let mut request_builder = self.client.post(url).json(&request);
+            if let Some(token) = call.authorization().bearer_token() {
+                request_builder = request_builder.bearer_auth(token.as_str());
+            }
+            let response = request_builder
                 .send()
                 .await
                 .map_err(|error| ProviderFailure::Unreachable(error.to_string()))?;
