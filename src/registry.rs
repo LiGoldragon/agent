@@ -258,6 +258,7 @@ impl ProviderRegistry {
             ProviderAuthorization::none()
         };
         Ok(ProviderCall::new(
+            provider_name,
             entry.endpoint().to_owned(),
             model,
             authorization,

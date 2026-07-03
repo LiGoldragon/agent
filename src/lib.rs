@@ -23,6 +23,7 @@ pub mod client;
 pub mod config;
 pub mod engine;
 pub mod error;
+pub mod interaction_log;
 pub mod provider;
 pub mod registry;
 pub mod schema_daemon;
@@ -36,9 +37,15 @@ pub mod schema {
     pub mod daemon;
 }
 
-pub use config::{AgentDaemonConfiguration, ConfigurationError, ProviderSeed};
+pub use config::{
+    AgentDaemonConfiguration, ConfigurationError, ProviderInteractionLogging, ProviderSeed,
+};
 pub use engine::AgentEngine;
 pub use error::{Error, Result};
+pub use interaction_log::{
+    ProviderInteractionLog, ProviderInteractionLogError, ProviderInteractionRecord,
+    ProviderValidationOutcome,
+};
 pub use provider::{
     FixtureProvider, Provider, ProviderAuthorization, ProviderCall, ProviderCompletion,
     ProviderFailure,

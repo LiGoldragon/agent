@@ -12,6 +12,7 @@ struct ConfigurationWriterSandbox {
     meta_socket_path: PathBuf,
     database_path: PathBuf,
     output_path: PathBuf,
+    interaction_log_path: PathBuf,
 }
 
 impl ConfigurationWriterSandbox {
@@ -22,6 +23,7 @@ impl ConfigurationWriterSandbox {
             meta_socket_path: directory.path().join("agent-meta.sock"),
             database_path: directory.path().join("agent.sema"),
             output_path: directory.path().join("agent.config.rkyv"),
+            interaction_log_path: directory.path().join("agent-provider-interactions.jsonl"),
             _directory: directory,
         }
     }
@@ -38,6 +40,10 @@ impl ConfigurationWriterSandbox {
 
     fn output_path(&self) -> &Path {
         &self.output_path
+    }
+
+    fn interaction_log_path(&self) -> &Path {
+        &self.interaction_log_path
     }
 }
 
@@ -64,6 +70,7 @@ fn configuration_writer_prebuilds_binary_archive_for_daemon_startup() {
     let configuration =
         AgentDaemonConfiguration::from_binary_path(sandbox.output_path()).expect("read archive");
     assert_eq!(configuration.bootstrap_providers()[0].name, "criomos-local");
+    assert!(configuration.provider_interaction_logging().is_disabled());
     assert!(matches!(
         configuration.bootstrap_providers()[0].secret_source,
         agent::registry::SecretSource::Gopass(_)
@@ -105,4 +112,38 @@ fn configuration_writer_accepts_local_provider_without_secret() {
         configuration.bootstrap_providers()[0].secret_source,
         agent::registry::SecretSource::NoSecret
     ));
+}
+
+#[test]
+fn configuration_writer_accepts_provider_interaction_jsonl_logging() {
+    let sandbox = ConfigurationWriterSandbox::new();
+    let request = format!(
+        "(AgentConfigurationWriteRequestWithProviderInteractionLogging ({} {} 384 {} [(ProviderSeed (local-openai http://127.0.0.1:18080/v1 gpt-5.5 NoSecret))] (JsonLines {}) {}))",
+        sandbox.ordinary_socket_path.display(),
+        sandbox.meta_socket_path.display(),
+        sandbox.database_path.display(),
+        sandbox.interaction_log_path().display(),
+        sandbox.output_path.display()
+    );
+    let output = Command::new(env!("CARGO_BIN_EXE_agent-write-configuration"))
+        .arg(request)
+        .output()
+        .expect("run agent-write-configuration");
+    assert!(
+        output.status.success(),
+        "writer failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let configuration =
+        AgentDaemonConfiguration::from_binary_path(sandbox.output_path()).expect("read archive");
+    match configuration.provider_interaction_logging() {
+        agent::ProviderInteractionLogging::JsonLines(path) => {
+            assert_eq!(
+                path.as_str(),
+                sandbox.interaction_log_path().display().to_string()
+            );
+        }
+        other => panic!("expected JsonLines logging, got {other:?}"),
+    }
 }

@@ -32,6 +32,9 @@ pub enum Error {
     #[error("configuration archive encode failed")]
     ConfigurationArchiveEncode,
 
+    #[error("configuration invalid: {0}")]
+    ConfigurationInvalid(String),
+
     #[error("meta request read timed out")]
     MetaRequestReadTimedOut,
 }

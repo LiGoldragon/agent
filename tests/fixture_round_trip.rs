@@ -8,14 +8,14 @@
 
 use agent::provider::{
     Provider, ProviderApiKey, ProviderCall, ProviderCompletion, ProviderCompletionFuture,
+    ProviderFailure,
 };
 use agent::registry::{
     KeySource, KeySourceFuture, ProviderEntry, ProviderRegistry, SecretSource, SystemKeySource,
 };
-use agent::{AgentEngine, FixtureProvider};
+use agent::{AgentEngine, FixtureProvider, ProviderInteractionLog};
 #[cfg(feature = "live-provider")]
 use nota::Document;
-#[cfg(feature = "live-provider")]
 use serde_json::Value;
 use signal_agent::{
     CallRejectionReason, ChatMessage, ChatTranscript, Input, MaximumOutputTokens, ModelName,
@@ -47,6 +47,8 @@ struct StaticProvider {
     text: &'static str,
 }
 
+struct RejectedProvider;
+
 impl KeySource for LiteralKeySource {
     fn resolve(&self, _source: SecretSource) -> KeySourceFuture<'_> {
         Box::pin(async { Ok(ProviderApiKey::new("test-key")) })
@@ -63,17 +65,45 @@ impl Provider for StaticProvider {
     fn complete(&self, _call: ProviderCall) -> ProviderCompletionFuture<'_> {
         let text = self.text.to_owned();
         Box::pin(async move {
+            let response_body = format!(
+                "{{\"choices\":[{{\"message\":{{\"content\":{}}}}}]}}",
+                serde_json::to_string(&text).expect("json string")
+            );
             Ok(ProviderCompletion {
                 text,
                 stop_reason: "stop".to_owned(),
                 prompt_tokens: None,
                 completion_tokens: None,
+                response_status: Some(200),
+                response_body: Some(response_body),
             })
         })
     }
 }
 
+impl Provider for RejectedProvider {
+    fn complete(&self, _call: ProviderCall) -> ProviderCompletionFuture<'_> {
+        Box::pin(async {
+            Err(ProviderFailure::provider_rejected_with_response(
+                "expected value at line 1 column 1",
+                Some(200),
+                Some("not-json".to_owned()),
+            ))
+        })
+    }
+}
+
 fn engine_with_deepseek() -> AgentEngine {
+    engine_with_provider_and_log(
+        Box::new(FixtureProvider::new()),
+        ProviderInteractionLog::disabled(),
+    )
+}
+
+fn engine_with_provider_and_log(
+    provider: Box<dyn Provider>,
+    provider_interaction_log: ProviderInteractionLog,
+) -> AgentEngine {
     let mut registry = ProviderRegistry::new();
     registry.configure(ProviderEntry::new(
         DEEPSEEK_PROVIDER,
@@ -81,11 +111,20 @@ fn engine_with_deepseek() -> AgentEngine {
         DEEPSEEK_MODEL,
         SecretSource::environment(DEEPSEEK_KEY_HANDLE),
     ));
-    AgentEngine::new(
+    AgentEngine::new_with_provider_interaction_log(
         registry,
-        Box::new(FixtureProvider::new()),
+        provider,
         Box::new(LiteralKeySource),
+        provider_interaction_log,
     )
+}
+
+fn read_json_lines(path: &std::path::Path) -> Vec<Value> {
+    std::fs::read_to_string(path)
+        .expect("read interaction log")
+        .lines()
+        .map(|line| serde_json::from_str(line).expect("json log line"))
+        .collect()
 }
 
 fn guardian_prompt(provider: Option<&str>) -> Prompt {
@@ -142,6 +181,50 @@ async fn fixture_provider_completes_a_call_offline() {
 }
 
 #[tokio::test]
+async fn provider_interaction_logging_is_disabled_by_default() {
+    let engine = engine_with_deepseek();
+    assert!(engine.provider_interaction_log().is_disabled());
+}
+
+#[tokio::test]
+async fn provider_interaction_logging_records_successful_completion_when_enabled() {
+    let directory = tempfile::TempDir::new().expect("tempdir");
+    let log_path = directory.path().join("provider-interactions.jsonl");
+    let mut engine = engine_with_provider_and_log(
+        Box::new(FixtureProvider::new()),
+        ProviderInteractionLog::json_lines_at(&log_path),
+    );
+    let output = engine
+        .handle(Input::Call(signal_agent::Call::new(guardian_prompt(Some(
+            DEEPSEEK_PROVIDER,
+        )))))
+        .await;
+    assert!(matches!(output, Output::Completed(_)));
+
+    let records = read_json_lines(&log_path);
+    assert_eq!(records.len(), 1);
+    let record = &records[0];
+    assert_eq!(record["provider"]["provider"], DEEPSEEK_PROVIDER);
+    assert_eq!(record["provider"]["model"], DEEPSEEK_MODEL);
+    assert_eq!(record["provider"]["authorization"], "bearer");
+    assert_eq!(
+        record["request"]["url"],
+        format!("{DEEPSEEK_ENDPOINT}/chat/completions")
+    );
+    assert_eq!(record["request"]["headers"]["authorization"], "<redacted>");
+    assert_eq!(record["request"]["body"]["model"], DEEPSEEK_MODEL);
+    assert_eq!(record["provider_result"]["kind"], "Completed");
+    assert_eq!(record["validation"]["kind"], "ValidNota");
+    assert_eq!(record["daemon_outcome"]["kind"], "Completed");
+    assert!(
+        !std::fs::read_to_string(&log_path)
+            .expect("read log")
+            .contains("test-key"),
+        "provider interaction log leaked the bearer token"
+    );
+}
+
+#[tokio::test]
 async fn call_with_no_configured_provider_is_rejected() {
     let mut engine = AgentEngine::new(
         ProviderRegistry::new(),
@@ -172,19 +255,9 @@ async fn default_provider_is_used_when_prompt_names_none() {
 
 #[tokio::test]
 async fn nota_output_rejects_empty_document() {
-    let mut engine = AgentEngine::new(
-        {
-            let mut registry = ProviderRegistry::new();
-            registry.configure(ProviderEntry::new(
-                DEEPSEEK_PROVIDER,
-                DEEPSEEK_ENDPOINT,
-                DEEPSEEK_MODEL,
-                SecretSource::environment(DEEPSEEK_KEY_HANDLE),
-            ));
-            registry
-        },
+    let mut engine = engine_with_provider_and_log(
         Box::new(StaticProvider::new("")),
-        Box::new(LiteralKeySource),
+        ProviderInteractionLog::disabled(),
     );
     let output = engine
         .handle(Input::Call(signal_agent::Call::new(guardian_prompt(Some(
@@ -205,20 +278,41 @@ async fn nota_output_rejects_empty_document() {
 }
 
 #[tokio::test]
+async fn provider_interaction_logging_records_invalid_nota_attempts_when_enabled() {
+    let directory = tempfile::TempDir::new().expect("tempdir");
+    let log_path = directory.path().join("provider-interactions.jsonl");
+    let mut engine = engine_with_provider_and_log(
+        Box::new(StaticProvider::new("")),
+        ProviderInteractionLog::json_lines_at(&log_path),
+    );
+    let output = engine
+        .handle(Input::Call(signal_agent::Call::new(guardian_prompt(Some(
+            DEEPSEEK_PROVIDER,
+        )))))
+        .await;
+    assert!(matches!(output, Output::CallRejected(_)));
+
+    let records = read_json_lines(&log_path);
+    assert_eq!(records.len(), 2);
+    for record in records {
+        assert_eq!(record["validation"]["kind"], "InvalidNota");
+        assert_eq!(record["daemon_outcome"]["kind"], "Rejected");
+        assert_eq!(record["daemon_outcome"]["reason"], "InvalidNotaOutput");
+        assert_eq!(record["response"]["status"], 200);
+        assert!(
+            record["response"]["body"]
+                .as_str()
+                .unwrap()
+                .contains("choices")
+        );
+    }
+}
+
+#[tokio::test]
 async fn nota_output_rejects_multiple_root_objects() {
-    let mut engine = AgentEngine::new(
-        {
-            let mut registry = ProviderRegistry::new();
-            registry.configure(ProviderEntry::new(
-                DEEPSEEK_PROVIDER,
-                DEEPSEEK_ENDPOINT,
-                DEEPSEEK_MODEL,
-                SecretSource::environment(DEEPSEEK_KEY_HANDLE),
-            ));
-            registry
-        },
+    let mut engine = engine_with_provider_and_log(
         Box::new(StaticProvider::new("Accept Accept")),
-        Box::new(LiteralKeySource),
+        ProviderInteractionLog::disabled(),
     );
     let output = engine
         .handle(Input::Call(signal_agent::Call::new(guardian_prompt(Some(
@@ -236,6 +330,35 @@ async fn nota_output_rejects_multiple_root_objects() {
         }
         other => panic!("expected InvalidNotaOutput rejection, got {other:?}"),
     }
+}
+
+#[tokio::test]
+async fn provider_interaction_logging_records_malformed_provider_response_when_enabled() {
+    let directory = tempfile::TempDir::new().expect("tempdir");
+    let log_path = directory.path().join("provider-interactions.jsonl");
+    let mut engine = engine_with_provider_and_log(
+        Box::new(RejectedProvider),
+        ProviderInteractionLog::json_lines_at(&log_path),
+    );
+    let output = engine
+        .handle(Input::Call(signal_agent::Call::new(guardian_prompt(Some(
+            DEEPSEEK_PROVIDER,
+        )))))
+        .await;
+    assert!(matches!(output, Output::CallRejected(_)));
+
+    let records = read_json_lines(&log_path);
+    assert_eq!(records.len(), 1);
+    let record = &records[0];
+    assert_eq!(record["provider_result"]["kind"], "Failed");
+    assert_eq!(
+        record["provider_result"]["failure_kind"],
+        "provider_rejected"
+    );
+    assert_eq!(record["response"]["status"], 200);
+    assert_eq!(record["response"]["body"], "not-json");
+    assert_eq!(record["validation"]["kind"], "NotReached");
+    assert_eq!(record["daemon_outcome"]["reason"], "ProviderRejected");
 }
 
 #[tokio::test]

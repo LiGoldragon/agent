@@ -20,12 +20,14 @@ use meta_signal_agent::{
 use signal_agent::schema::lib::{Input, Output};
 use tokio::io::AsyncWriteExt;
 use triad_runtime::{
-    AcceptedConnection, ConnectionContext, FrameBody, LengthPrefixedCodec, MaximumFrameLength,
+    AcceptedConnection, BindingSurface, ConnectionContext, FrameBody, LengthPrefixedCodec,
+    MaximumFrameLength,
 };
 
 use crate::config::{AgentDaemonConfiguration, ConfigurationError};
 use crate::engine::AgentEngine;
 use crate::error::Error;
+use crate::interaction_log::ProviderInteractionLog;
 use crate::provider::Provider;
 use crate::registry::ProviderEntry;
 use crate::schema::daemon::ComponentDaemon;
@@ -77,9 +79,15 @@ impl ComponentDaemon for AgentDaemon {
     }
 
     fn build_runtime(configuration: &Self::Configuration) -> Result<Self::Engine, Self::Error> {
-        let mut engine = AgentEngine::with_system_keys(
+        let provider_interaction_log = ProviderInteractionLog::from_configuration(
+            configuration.database_path(),
+            configuration.provider_interaction_logging(),
+        )
+        .map_err(|error| Error::ConfigurationInvalid(error.to_string()))?;
+        let mut engine = AgentEngine::with_system_keys_and_provider_interaction_log(
             crate::registry::ProviderRegistry::new(),
             Self::production_provider(),
+            provider_interaction_log,
         );
         for seed in configuration.bootstrap_providers() {
             engine.configure_provider(seed.clone().into_entry());

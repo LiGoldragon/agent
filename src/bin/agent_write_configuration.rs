@@ -9,8 +9,8 @@ use std::{
 };
 
 use agent::{
-    AgentDaemonConfiguration, ConfigurationError, ProviderSeed as RuntimeProviderSeed,
-    registry::SecretSource as RuntimeSecretSource,
+    AgentDaemonConfiguration, ConfigurationError, ProviderInteractionLogging,
+    ProviderSeed as RuntimeProviderSeed, registry::SecretSource as RuntimeSecretSource,
 };
 use meta_signal_agent::SecretSource as ConfigurationWriterSecretSource;
 use nota::{NotaDecode, NotaDecodeError, NotaEncode, NotaSource};
@@ -45,6 +45,9 @@ struct AgentConfigurationWriteRequest {
 #[derive(Debug, Clone, PartialEq, Eq, NotaDecode)]
 enum AgentConfigurationWriterInput {
     AgentConfigurationWriteRequest(AgentConfigurationWriteRequest),
+    AgentConfigurationWriteRequestWithProviderInteractionLogging(
+        AgentConfigurationWriteRequestWithProviderInteractionLogging,
+    ),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, NotaDecode, NotaEncode)]
@@ -61,6 +64,34 @@ enum ProviderSeed {
         ConfigurationWriterModelName,
         ConfigurationWriterSecretSource,
     ),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, NotaDecode)]
+struct AgentConfigurationWriteRequestWithProviderInteractionLogging {
+    ordinary_socket_path: ConfigurationWriterPath,
+    meta_socket_path: ConfigurationWriterPath,
+    meta_socket_mode: ConfigurationWriterSocketMode,
+    database_path: ConfigurationWriterPath,
+    bootstrap_providers: Vec<ProviderSeed>,
+    provider_interaction_logging: ConfigurationWriterProviderInteractionLogging,
+    output_path: ConfigurationWriterPath,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, NotaDecode, NotaEncode)]
+enum ConfigurationWriterProviderInteractionLogging {
+    Disabled,
+    JsonLines(ConfigurationWriterPath),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct AgentConfigurationWriteCommand {
+    ordinary_socket_path: ConfigurationWriterPath,
+    meta_socket_path: ConfigurationWriterPath,
+    meta_socket_mode: ConfigurationWriterSocketMode,
+    database_path: ConfigurationWriterPath,
+    bootstrap_providers: Vec<ProviderSeed>,
+    provider_interaction_logging: ConfigurationWriterProviderInteractionLogging,
+    output_path: ConfigurationWriterPath,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, NotaDecode, NotaEncode)]
@@ -122,7 +153,7 @@ impl AgentConfigurationWriterInputSource {
         Self { text }
     }
 
-    fn parse_request(&self) -> Result<AgentConfigurationWriteRequest, NotaDecodeError> {
+    fn parse_request(&self) -> Result<AgentConfigurationWriteCommand, NotaDecodeError> {
         NotaSource::new(&self.text)
             .parse::<AgentConfigurationWriterInput>()
             .map(AgentConfigurationWriterInput::into_request)
@@ -130,14 +161,45 @@ impl AgentConfigurationWriterInputSource {
 }
 
 impl AgentConfigurationWriterInput {
-    fn into_request(self) -> AgentConfigurationWriteRequest {
+    fn into_request(self) -> AgentConfigurationWriteCommand {
         match self {
-            Self::AgentConfigurationWriteRequest(request) => request,
+            Self::AgentConfigurationWriteRequest(request) => request.into_write_command(),
+            Self::AgentConfigurationWriteRequestWithProviderInteractionLogging(request) => {
+                request.into_write_command()
+            }
         }
     }
 }
 
 impl AgentConfigurationWriteRequest {
+    fn into_write_command(self) -> AgentConfigurationWriteCommand {
+        AgentConfigurationWriteCommand {
+            ordinary_socket_path: self.ordinary_socket_path,
+            meta_socket_path: self.meta_socket_path,
+            meta_socket_mode: self.meta_socket_mode,
+            database_path: self.database_path,
+            bootstrap_providers: self.bootstrap_providers,
+            provider_interaction_logging: ConfigurationWriterProviderInteractionLogging::Disabled,
+            output_path: self.output_path,
+        }
+    }
+}
+
+impl AgentConfigurationWriteRequestWithProviderInteractionLogging {
+    fn into_write_command(self) -> AgentConfigurationWriteCommand {
+        AgentConfigurationWriteCommand {
+            ordinary_socket_path: self.ordinary_socket_path,
+            meta_socket_path: self.meta_socket_path,
+            meta_socket_mode: self.meta_socket_mode,
+            database_path: self.database_path,
+            bootstrap_providers: self.bootstrap_providers,
+            provider_interaction_logging: self.provider_interaction_logging,
+            output_path: self.output_path,
+        }
+    }
+}
+
+impl AgentConfigurationWriteCommand {
     fn write(self) -> Result<AgentConfigurationWriteOutput, AgentConfigurationWriterCliError> {
         let output_path = self.output_path.clone();
         let configuration = self.configuration();
@@ -150,7 +212,7 @@ impl AgentConfigurationWriteRequest {
     }
 
     fn configuration(self) -> AgentDaemonConfiguration {
-        AgentDaemonConfiguration::new(
+        AgentDaemonConfiguration::new_with_provider_interaction_logging(
             self.ordinary_socket_path.into_string(),
             self.meta_socket_path.into_string(),
             self.meta_socket_mode.into_mode(),
@@ -159,6 +221,7 @@ impl AgentConfigurationWriteRequest {
                 .into_iter()
                 .map(ProviderSeed::into_runtime_provider_seed)
                 .collect(),
+            self.provider_interaction_logging.into_runtime(),
         )
     }
 }
@@ -170,6 +233,15 @@ impl ConfigurationWriterPath {
 
     fn into_string(self) -> String {
         self.0
+    }
+}
+
+impl ConfigurationWriterProviderInteractionLogging {
+    fn into_runtime(self) -> ProviderInteractionLogging {
+        match self {
+            Self::Disabled => ProviderInteractionLogging::disabled(),
+            Self::JsonLines(path) => ProviderInteractionLogging::json_lines(path.into_string()),
+        }
     }
 }
 
