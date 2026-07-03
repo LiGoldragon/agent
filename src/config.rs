@@ -32,45 +32,6 @@ pub struct ProviderSeed {
     pub secret_source: SecretSource,
 }
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Clone, Debug, PartialEq, Eq)]
-pub enum ProviderInteractionLogging {
-    Disabled,
-    JsonLines(ProviderInteractionLogPath),
-}
-
-impl ProviderInteractionLogging {
-    pub fn disabled() -> Self {
-        Self::Disabled
-    }
-
-    pub fn json_lines(path: impl Into<String>) -> Self {
-        Self::JsonLines(ProviderInteractionLogPath::new(path))
-    }
-
-    pub fn is_disabled(&self) -> bool {
-        matches!(self, Self::Disabled)
-    }
-}
-
-impl Default for ProviderInteractionLogging {
-    fn default() -> Self {
-        Self::disabled()
-    }
-}
-
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Clone, Debug, PartialEq, Eq)]
-pub struct ProviderInteractionLogPath(String);
-
-impl ProviderInteractionLogPath {
-    pub fn new(value: impl Into<String>) -> Self {
-        Self(value.into())
-    }
-
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
 impl ProviderSeed {
     pub fn new(
         name: impl Into<String>,
@@ -104,7 +65,6 @@ pub struct AgentDaemonConfiguration {
     meta_socket_mode: u32,
     database_path: String,
     bootstrap_providers: Vec<ProviderSeed>,
-    provider_interaction_logging: ProviderInteractionLogging,
 }
 
 impl AgentDaemonConfiguration {
@@ -121,34 +81,11 @@ impl AgentDaemonConfiguration {
             meta_socket_mode,
             database_path: database_path.into(),
             bootstrap_providers,
-            provider_interaction_logging: ProviderInteractionLogging::disabled(),
-        }
-    }
-
-    pub fn new_with_provider_interaction_logging(
-        ordinary_socket_path: impl Into<String>,
-        meta_socket_path: impl Into<String>,
-        meta_socket_mode: u32,
-        database_path: impl Into<String>,
-        bootstrap_providers: Vec<ProviderSeed>,
-        provider_interaction_logging: ProviderInteractionLogging,
-    ) -> Self {
-        Self {
-            ordinary_socket_path: ordinary_socket_path.into(),
-            meta_socket_path: meta_socket_path.into(),
-            meta_socket_mode,
-            database_path: database_path.into(),
-            bootstrap_providers,
-            provider_interaction_logging,
         }
     }
 
     pub fn bootstrap_providers(&self) -> &[ProviderSeed] {
         &self.bootstrap_providers
-    }
-
-    pub fn provider_interaction_logging(&self) -> &ProviderInteractionLogging {
-        &self.provider_interaction_logging
     }
 
     pub fn from_binary_path(path: impl AsRef<Path>) -> Result<Self, ConfigurationError> {

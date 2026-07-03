@@ -16,11 +16,6 @@ server. Secrets are never hardcoded and never logged.
   argument; binds an ordinary (working) socket and a `0o600` meta socket.
 - `agent` — the thin CLI: one NOTA `signal_agent::Input` argument, `AGENT_SOCKET`
   from the environment, NOTA reply on stdout.
-- `agent-write-configuration` — the deploy/bootstrap text edge. The legacy
-  `(AgentConfigurationWriteRequest ...)` shape leaves provider interaction
-  logging disabled. To enable full JSONL provider interaction logging, use
-  `(AgentConfigurationWriteRequestWithProviderInteractionLogging (<ordinary-socket> <meta-socket> <meta-mode> <database-path> <provider-seeds> (JsonLines <log-path>) <output-rkyv>))`.
-  The log path must be separate from the agent database path.
 
 Build offline with the fixture provider (default). The reqwest-backed real call
 is behind `--features live-provider`; the live-network test gates on a key.

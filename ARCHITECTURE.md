@@ -83,25 +83,6 @@ The registry is configured through the meta tier (`handle_meta_connection`
 decodes `meta_signal_agent::Input`, mutates the registry) and seeded at startup
 from the binary configuration's `bootstrap_providers`.
 
-## Provider interaction log
-
-Full provider interaction logging is an explicit startup configuration setting,
-disabled by default. The binary `AgentDaemonConfiguration` carries
-`ProviderInteractionLogging::{Disabled | JsonLines(path)}`; the text bootstrap
-edge exposes this as
-`(AgentConfigurationWriteRequestWithProviderInteractionLogging (... (JsonLines <log-path>) ...))`.
-The old `(AgentConfigurationWriteRequest ...)` writer shape still produces
-`Disabled`.
-
-When enabled, `AgentEngine` appends one JSON object per provider attempt to the
-configured JSONL file. The log is outside the agent database: startup rejects a
-logging path equal to the configured database path. Each record includes the
-provider name, endpoint, model, redacted authorization metadata, the exact
-OpenAI-compatible request body, response status/body when available,
-provider-level success/failure, NOTA validation outcome, and the daemon outcome.
-Bearer values and generated Authorization headers are redacted; `NoSecret`
-records no Authorization header.
-
 ## Two authority tiers
 
 - **Working tier** (`signal-agent`): `Call` / `StreamCall` / `CancelStream`. The
@@ -139,7 +120,6 @@ src/schema/{nexus,sema,daemon}.rs   generated runtime (freshness-checked)
 src/engine.rs              AgentEngine: NexusEngine + SemaEngine impls
 src/provider.rs            Provider trait, FixtureProvider, OpenAiCompatibleProvider
 src/registry.rs            ProviderRegistry, KeySource, ProviderEntry
-src/interaction_log.rs     Disabled-by-default JSONL provider interaction log
 src/config.rs              binary rkyv AgentDaemonConfiguration
 src/schema_daemon.rs       ComponentDaemon impl + meta-tier projection
 src/client.rs              CLI daemon client

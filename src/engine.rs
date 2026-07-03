@@ -20,10 +20,6 @@ use signal_agent::{
     StopReasonText, TokenUsage, UnimplementedReason,
 };
 
-use crate::interaction_log::{
-    ProviderInteractionLog, ProviderInteractionLogError, ProviderInteractionRecord,
-    ProviderValidationOutcome,
-};
 use crate::provider::{Provider, ProviderCall, ProviderCompletion, ProviderFailure};
 use crate::registry::{KeySource, ProviderEntry, ProviderRegistry, ResolveError, SystemKeySource};
 use crate::schema::nexus::{
@@ -42,7 +38,6 @@ pub struct AgentEngine {
     registry: ProviderRegistry,
     provider: Box<dyn Provider>,
     keys: Box<dyn KeySource + Send + Sync>,
-    provider_interaction_log: ProviderInteractionLog,
 }
 
 impl std::fmt::Debug for AgentEngine {
@@ -51,7 +46,6 @@ impl std::fmt::Debug for AgentEngine {
             .debug_struct("AgentEngine")
             .field("registry", &self.registry)
             .field("provider", &"<provider>")
-            .field("provider_interaction_log", &self.provider_interaction_log)
             .finish()
     }
 }
@@ -66,21 +60,6 @@ impl AgentEngine {
             registry,
             provider,
             keys,
-            provider_interaction_log: ProviderInteractionLog::disabled(),
-        }
-    }
-
-    pub fn new_with_provider_interaction_log(
-        registry: ProviderRegistry,
-        provider: Box<dyn Provider>,
-        keys: Box<dyn KeySource + Send + Sync>,
-        provider_interaction_log: ProviderInteractionLog,
-    ) -> Self {
-        Self {
-            registry,
-            provider,
-            keys,
-            provider_interaction_log,
         }
     }
 
@@ -88,23 +67,6 @@ impl AgentEngine {
     /// `live-provider`, the fixture otherwise, plus the environment key source.
     pub fn with_system_keys(registry: ProviderRegistry, provider: Box<dyn Provider>) -> Self {
         Self::new(registry, provider, Box::new(SystemKeySource))
-    }
-
-    pub fn with_system_keys_and_provider_interaction_log(
-        registry: ProviderRegistry,
-        provider: Box<dyn Provider>,
-        provider_interaction_log: ProviderInteractionLog,
-    ) -> Self {
-        Self::new_with_provider_interaction_log(
-            registry,
-            provider,
-            Box::new(SystemKeySource),
-            provider_interaction_log,
-        )
-    }
-
-    pub fn provider_interaction_log(&self) -> &ProviderInteractionLog {
-        &self.provider_interaction_log
     }
 
     pub fn registry(&self) -> &ProviderRegistry {
@@ -193,34 +155,9 @@ impl AgentEngine {
 
     /// One provider call, no output validation — the `FreeText` path.
     async fn complete_once(&self, call: ProviderCall) -> ProviderOutcome {
-        match self.provider.complete(call.clone()).await {
-            Ok(completion) => {
-                if let Err(error) = self
-                    .provider_interaction_log
-                    .record(ProviderInteractionRecord::completed(
-                        &call,
-                        &completion,
-                        ProviderValidationOutcome::not_required(),
-                    ))
-                    .await
-                {
-                    return ProviderOutcome::rejected(Self::interaction_log_rejection(error));
-                }
-                ProviderOutcome::completed(Self::completion(completion))
-            }
-            Err(failure) => {
-                let rejection = Self::failure_rejection(failure.clone());
-                if let Err(error) = self
-                    .provider_interaction_log
-                    .record(ProviderInteractionRecord::rejected(
-                        &call, &failure, &rejection,
-                    ))
-                    .await
-                {
-                    return ProviderOutcome::rejected(Self::interaction_log_rejection(error));
-                }
-                ProviderOutcome::rejected(rejection)
-            }
+        match self.provider.complete(call).await {
+            Ok(completion) => ProviderOutcome::completed(Self::completion(completion)),
+            Err(failure) => ProviderOutcome::rejected(Self::failure_rejection(failure)),
         }
     }
 
@@ -235,55 +172,13 @@ impl AgentEngine {
         for _ in 0..NOTA_OUTPUT_ATTEMPTS {
             match self.provider.complete(attempt.clone()).await {
                 Ok(completion) => match Self::validate_nota_completion(completion.text.as_str()) {
-                    Ok(_) => {
-                        if let Err(error) = self
-                            .provider_interaction_log
-                            .record(ProviderInteractionRecord::completed(
-                                &attempt,
-                                &completion,
-                                ProviderValidationOutcome::valid_nota(),
-                            ))
-                            .await
-                        {
-                            return ProviderOutcome::rejected(Self::interaction_log_rejection(
-                                error,
-                            ));
-                        }
-                        return ProviderOutcome::completed(Self::completion(completion));
-                    }
+                    Ok(_) => return ProviderOutcome::completed(Self::completion(completion)),
                     Err(error) => {
                         last_error = error;
-                        let rejection = Self::invalid_nota_rejection(&last_error);
-                        if let Err(error) = self
-                            .provider_interaction_log
-                            .record(ProviderInteractionRecord::validation_rejected(
-                                &attempt,
-                                &completion,
-                                &last_error,
-                                &rejection,
-                            ))
-                            .await
-                        {
-                            return ProviderOutcome::rejected(Self::interaction_log_rejection(
-                                error,
-                            ));
-                        }
                         attempt = attempt.with_nota_correction(&completion.text, &last_error);
                     }
                 },
-                Err(failure) => {
-                    let rejection = Self::failure_rejection(failure.clone());
-                    if let Err(error) = self
-                        .provider_interaction_log
-                        .record(ProviderInteractionRecord::rejected(
-                            &attempt, &failure, &rejection,
-                        ))
-                        .await
-                    {
-                        return ProviderOutcome::rejected(Self::interaction_log_rejection(error));
-                    }
-                    return ProviderOutcome::rejected(rejection);
-                }
+                Err(failure) => return ProviderOutcome::rejected(Self::failure_rejection(failure)),
             }
         }
         ProviderOutcome::rejected(Self::invalid_nota_rejection(&last_error))
@@ -337,7 +232,7 @@ impl AgentEngine {
                 reason: CallRejectionReason::ProviderUnreachable,
                 detail: RejectionDetail::new(detail),
             },
-            ProviderFailure::ProviderRejected { detail, .. } => CallRejection {
+            ProviderFailure::ProviderRejected(detail) => CallRejection {
                 reason: CallRejectionReason::ProviderRejected,
                 detail: RejectionDetail::new(detail),
             },
@@ -347,13 +242,6 @@ impl AgentEngine {
                     "provider does not support the requested output mode".to_owned(),
                 ),
             },
-        }
-    }
-
-    fn interaction_log_rejection(error: ProviderInteractionLogError) -> CallRejection {
-        CallRejection {
-            reason: CallRejectionReason::DaemonUnconfigured,
-            detail: RejectionDetail::new(format!("provider interaction log unavailable: {error}")),
         }
     }
 

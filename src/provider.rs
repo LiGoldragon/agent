@@ -16,8 +16,6 @@
 //! serves every configured provider — only the endpoint, model, and
 //! authorization differ.
 
-use serde::Serialize;
-use serde_json::Value;
 use signal_agent::{ChatRole, OutputMode, ReasoningEffort, ThinkingMode};
 
 /// One fully-resolved provider call: the registry has already turned a
@@ -26,7 +24,6 @@ use signal_agent::{ChatRole, OutputMode, ReasoningEffort, ThinkingMode};
 /// are never stored, logged, or sent anywhere but the provider endpoint.
 #[derive(Debug, Clone)]
 pub struct ProviderCall {
-    provider_name: String,
     endpoint: String,
     model: String,
     authorization: ProviderAuthorization,
@@ -48,7 +45,6 @@ const NOTA_OUTPUT_INSTRUCTION: &str = "Respond with exactly one valid NOTA s-exp
 impl ProviderCall {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        provider_name: impl Into<String>,
         endpoint: impl Into<String>,
         model: impl Into<String>,
         authorization: ProviderAuthorization,
@@ -61,7 +57,6 @@ impl ProviderCall {
         thinking_mode: Option<ThinkingMode>,
     ) -> Self {
         Self {
-            provider_name: provider_name.into(),
             endpoint: endpoint.into(),
             model: model.into(),
             authorization,
@@ -73,10 +68,6 @@ impl ProviderCall {
             reasoning_effort,
             thinking_mode,
         }
-    }
-
-    pub fn provider_name(&self) -> &str {
-        &self.provider_name
     }
 
     pub fn endpoint(&self) -> &str {
@@ -132,18 +123,6 @@ impl ProviderCall {
             ThinkingMode::Enabled => Some("enabled"),
             ThinkingMode::Disabled => Some("disabled"),
         }
-    }
-
-    pub fn chat_completions_url(&self) -> String {
-        format!("{}/chat/completions", self.endpoint().trim_end_matches('/'))
-    }
-
-    pub fn request_body(&self) -> ChatCompletionRequest {
-        ChatCompletionRequest::from_call(self)
-    }
-
-    pub fn request_body_value(&self) -> Value {
-        serde_json::to_value(self.request_body()).unwrap_or(Value::Null)
     }
 
     /// A copy of this call with the NOTA-output instruction folded into the system
@@ -232,13 +211,6 @@ impl ProviderAuthorization {
             Self::None => None,
         }
     }
-
-    pub fn log_label(&self) -> &'static str {
-        match self {
-            Self::Bearer(_) => "bearer",
-            Self::None => "none",
-        }
-    }
 }
 
 impl std::fmt::Debug for ProviderAuthorization {
@@ -285,8 +257,6 @@ pub struct ProviderCompletion {
     pub stop_reason: String,
     pub prompt_tokens: Option<u64>,
     pub completion_tokens: Option<u64>,
-    pub response_status: Option<u16>,
-    pub response_body: Option<String>,
 }
 
 /// A typed provider-call failure. The daemon maps each variant to a
@@ -294,34 +264,8 @@ pub struct ProviderCompletion {
 #[derive(Debug, Clone)]
 pub enum ProviderFailure {
     Unreachable(String),
-    ProviderRejected {
-        detail: String,
-        response_status: Option<u16>,
-        response_body: Option<String>,
-    },
+    ProviderRejected(String),
     OutputModeUnsupported,
-}
-
-impl ProviderFailure {
-    pub fn provider_rejected(detail: impl Into<String>) -> Self {
-        Self::ProviderRejected {
-            detail: detail.into(),
-            response_status: None,
-            response_body: None,
-        }
-    }
-
-    pub fn provider_rejected_with_response(
-        detail: impl Into<String>,
-        response_status: Option<u16>,
-        response_body: Option<String>,
-    ) -> Self {
-        Self::ProviderRejected {
-            detail: detail.into(),
-            response_status,
-            response_body,
-        }
-    }
 }
 
 /// The future a `Provider::complete` returns. Boxed so `Provider` is
@@ -373,65 +317,8 @@ impl FixtureProvider {
             stop_reason: "stop".to_owned(),
             prompt_tokens: None,
             completion_tokens: None,
-            response_status: None,
-            response_body: None,
         }
     }
-}
-
-#[derive(Debug, Serialize)]
-pub struct ChatCompletionRequest {
-    model: String,
-    messages: Vec<ChatCompletionMessage>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    temperature: Option<f64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    max_tokens: Option<u64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    reasoning_effort: Option<&'static str>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    thinking: Option<ThinkingDirective>,
-}
-
-impl ChatCompletionRequest {
-    fn from_call(call: &ProviderCall) -> Self {
-        let mut messages = Vec::new();
-        if let Some(system) = call.system() {
-            messages.push(ChatCompletionMessage {
-                role: "system".to_owned(),
-                content: system.to_owned(),
-            });
-        }
-        for message in call.messages() {
-            messages.push(ChatCompletionMessage {
-                role: message.role_name().to_owned(),
-                content: message.content().to_owned(),
-            });
-        }
-        Self {
-            model: call.model().to_owned(),
-            messages,
-            temperature: call.temperature(),
-            max_tokens: call.maximum_output_tokens(),
-            reasoning_effort: call.reasoning_effort(),
-            thinking: call
-                .thinking_directive()
-                .map(|kind| ThinkingDirective { kind }),
-        }
-    }
-}
-
-#[derive(Debug, Serialize)]
-struct ChatCompletionMessage {
-    role: String,
-    content: String,
-}
-
-/// DeepSeek's top-level `thinking` toggle object: `{"type": "enabled"}`.
-#[derive(Debug, Serialize)]
-struct ThinkingDirective {
-    #[serde(rename = "type")]
-    kind: &'static str,
 }
 
 impl Provider for FixtureProvider {
@@ -446,7 +333,7 @@ pub use live::OpenAiCompatibleProvider;
 #[cfg(feature = "live-provider")]
 mod live {
     use super::{Provider, ProviderCall, ProviderCompletion, ProviderFailure};
-    use serde::Deserialize;
+    use serde::{Deserialize, Serialize};
 
     /// The reqwest-backed OpenAI-compatible provider. One client serves every
     /// configured provider — DeepSeek, MiMo, Kimi, GLM, MiniMax, or a local
@@ -477,8 +364,8 @@ mod live {
             &self,
             call: ProviderCall,
         ) -> Result<ProviderCompletion, ProviderFailure> {
-            let request = call.request_body();
-            let url = call.chat_completions_url();
+            let request = ChatCompletionRequest::from_call(&call);
+            let url = format!("{}/chat/completions", call.endpoint().trim_end_matches('/'));
             let mut request_builder = self.client.post(url).json(&request);
             if let Some(token) = call.authorization().bearer_token() {
                 request_builder = request_builder.bearer_auth(token.as_str());
@@ -487,25 +374,18 @@ mod live {
                 .send()
                 .await
                 .map_err(|error| ProviderFailure::Unreachable(error.to_string()))?;
-            let status = response.status();
-            let response_status = Some(status.as_u16());
-            let response_body = response.text().await.unwrap_or_default();
-            if !status.is_success() {
-                return Err(ProviderFailure::provider_rejected_with_response(
-                    format!("status {status}: {response_body}"),
-                    response_status,
-                    Some(response_body),
-                ));
+            if !response.status().is_success() {
+                let status = response.status();
+                let body = response.text().await.unwrap_or_default();
+                return Err(ProviderFailure::ProviderRejected(format!(
+                    "status {status}: {body}"
+                )));
             }
-            let completion: ChatCompletionResponse =
-                serde_json::from_str(&response_body).map_err(|error| {
-                    ProviderFailure::provider_rejected_with_response(
-                        error.to_string(),
-                        response_status,
-                        Some(response_body.clone()),
-                    )
-                })?;
-            completion.into_provider_completion(response_status, Some(response_body))
+            let completion: ChatCompletionResponse = response
+                .json()
+                .await
+                .map_err(|error| ProviderFailure::ProviderRejected(error.to_string()))?;
+            completion.into_provider_completion()
         }
     }
 
@@ -515,6 +395,61 @@ mod live {
         }
     }
 
+    #[derive(Debug, Serialize)]
+    struct ChatCompletionRequest {
+        model: String,
+        messages: Vec<ChatCompletionMessage>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        temperature: Option<f64>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        max_tokens: Option<u64>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        reasoning_effort: Option<&'static str>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        thinking: Option<ThinkingDirective>,
+    }
+
+    /// DeepSeek's top-level `thinking` toggle object: `{"type": "enabled"}`.
+    #[derive(Debug, Serialize)]
+    struct ThinkingDirective {
+        #[serde(rename = "type")]
+        kind: &'static str,
+    }
+
+    impl ChatCompletionRequest {
+        fn from_call(call: &ProviderCall) -> Self {
+            let mut messages = Vec::new();
+            if let Some(system) = call.system() {
+                messages.push(ChatCompletionMessage {
+                    role: "system".to_owned(),
+                    content: system.to_owned(),
+                });
+            }
+            for message in call.messages() {
+                messages.push(ChatCompletionMessage {
+                    role: message.role_name().to_owned(),
+                    content: message.content().to_owned(),
+                });
+            }
+            Self {
+                model: call.model().to_owned(),
+                messages,
+                temperature: call.temperature(),
+                max_tokens: call.maximum_output_tokens(),
+                reasoning_effort: call.reasoning_effort(),
+                thinking: call
+                    .thinking_directive()
+                    .map(|kind| ThinkingDirective { kind }),
+            }
+        }
+    }
+
+    #[derive(Debug, Serialize)]
+    struct ChatCompletionMessage {
+        role: String,
+        content: String,
+    }
+
     #[derive(Debug, Deserialize)]
     struct ChatCompletionResponse {
         choices: Vec<ChatCompletionChoice>,
@@ -522,26 +457,16 @@ mod live {
     }
 
     impl ChatCompletionResponse {
-        fn into_provider_completion(
-            self,
-            response_status: Option<u16>,
-            response_body: Option<String>,
-        ) -> Result<ProviderCompletion, ProviderFailure> {
+        fn into_provider_completion(self) -> Result<ProviderCompletion, ProviderFailure> {
             let usage = self.usage;
             let choice = self.choices.into_iter().next().ok_or_else(|| {
-                ProviderFailure::provider_rejected_with_response(
-                    "response carried no choices".to_owned(),
-                    response_status,
-                    response_body.clone(),
-                )
+                ProviderFailure::ProviderRejected("response carried no choices".to_owned())
             })?;
             Ok(ProviderCompletion {
                 text: choice.message.content,
                 stop_reason: choice.finish_reason.unwrap_or_else(|| "stop".to_owned()),
                 prompt_tokens: usage.as_ref().and_then(|usage| usage.prompt_tokens),
                 completion_tokens: usage.and_then(|usage| usage.completion_tokens),
-                response_status,
-                response_body,
             })
         }
     }

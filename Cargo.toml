@@ -1,6 +1,6 @@
 [package]
 name         = "agent"
-version      = "0.2.1"
+version      = "0.2.0"
 edition      = "2024"
 rust-version = "1.89"
 license      = "MIT OR Apache-2.0"
@@ -31,7 +31,7 @@ nota-text = ["signal-agent/nota-text", "meta-signal-agent/nota-text"]
 # `live-provider` turns on the reqwest-backed OpenAI-compatible provider. Off by
 # default so the crate (and its fixture round-trip test) builds with no network
 # stack. Real-network tests gate on an API key being present at runtime.
-live-provider = ["dep:reqwest"]
+live-provider = ["dep:reqwest", "dep:serde", "dep:serde_json"]
 
 [dependencies]
 nota = { package = "nota", git = "https://github.com/LiGoldragon/nota-next.git", branch = "main" }
@@ -44,8 +44,8 @@ tokio            = { version = "1", features = ["fs", "io-util", "macros", "proc
 triad-runtime    = { git = "https://github.com/LiGoldragon/triad-runtime.git", branch = "main" }
 
 reqwest      = { version = "0.12", default-features = false, features = ["json", "rustls-tls"], optional = true }
-serde        = { version = "1", features = ["derive"] }
-serde_json   = { version = "1" }
+serde        = { version = "1", features = ["derive"], optional = true }
+serde_json   = { version = "1", optional = true }
 
 [build-dependencies]
 schema-rust = { package = "schema-rust", git = "https://github.com/LiGoldragon/schema-rust-next.git", branch = "main" }
