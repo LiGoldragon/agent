@@ -633,7 +633,7 @@ checksum = "88904434abc2901f197fe8cc55f0445e7ded921dba5911dad2e2b39b48e663c4"
 [[package]]
 name = "meta-signal-agent"
 version = "0.2.1"
-source = "git+https://github.com/LiGoldragon/meta-signal-agent.git?branch=drop-next#fd099d8dad55975779f99721a238c7557892f404"
+source = "git+https://github.com/LiGoldragon/meta-signal-agent.git?branch=drop-next#b4f6a85673d5e05b29a12162e55f110c2ffc5c1e"
 dependencies = [
  "nota",
  "rkyv",
@@ -1072,7 +1072,7 @@ dependencies = [
 [[package]]
 name = "schema-rust"
 version = "0.5.3"
-source = "git+https://github.com/LiGoldragon/schema-rust.git?branch=drop-next#94a0aa88a1d909b6f87cbf1431762c6fb0e19b71"
+source = "git+https://github.com/LiGoldragon/schema-rust.git?branch=drop-next#72c71ffc558fee0d29c5b0517013de46e0307597"
 dependencies = [
  "nota",
  "prettyplease",
@@ -1148,7 +1148,7 @@ checksum = "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
 [[package]]
 name = "signal-agent"
 version = "0.3.0"
-source = "git+https://github.com/LiGoldragon/signal-agent.git?branch=drop-next#25cbde4e50f557a4e7b2bc59d2a8a1e9831ea0a3"
+source = "git+https://github.com/LiGoldragon/signal-agent.git?branch=drop-next#064f2fe6d0df64acc73b8080affb9262c20aaa1f"
 dependencies = [
  "nota",
  "rkyv",
