@@ -309,7 +309,7 @@ impl FixtureProvider {
             .map(|message| message.content())
             .unwrap_or("");
         let text = match call.output_mode() {
-            OutputMode::Nota => "(Verdict accepted)".to_owned(),
+            OutputMode::Nota => "(FixtureCompletion ok)".to_owned(),
             OutputMode::FreeText => format!("fixture completion for: {last_user}"),
         };
         ProviderCompletion {
