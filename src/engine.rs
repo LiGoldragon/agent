@@ -92,8 +92,8 @@ impl AgentEngine {
         match action {
             NexusAction::ReplyToSignal(output) => output.into_payload(),
             other => Output::CallRejected(CallRejection {
-                reason: CallRejectionReason::ProviderRejected,
-                detail: RejectionDetail::new(format!(
+                call_rejection_reason: CallRejectionReason::ProviderRejected,
+                rejection_detail: RejectionDetail::new(format!(
                     "nexus runner returned non-reply action: {other:?}"
                 )),
             }),
@@ -108,14 +108,14 @@ impl AgentEngine {
             }
             signal_agent::Input::StreamCall(_) => {
                 NexusAction::reply_to_signal(Output::RequestUnimplemented(RequestUnimplemented {
-                    operation: OperationKind::StreamCall,
-                    reason: UnimplementedReason::NotInPrototypeScope,
+                    operation_kind: OperationKind::StreamCall,
+                    unimplemented_reason: UnimplementedReason::NotInPrototypeScope,
                 }))
             }
             signal_agent::Input::CancelStream(_) => {
                 NexusAction::reply_to_signal(Output::RequestUnimplemented(RequestUnimplemented {
-                    operation: OperationKind::CancelStream,
-                    reason: UnimplementedReason::NotInPrototypeScope,
+                    operation_kind: OperationKind::CancelStream,
+                    unimplemented_reason: UnimplementedReason::NotInPrototypeScope,
                 }))
             }
         }
@@ -199,7 +199,7 @@ impl AgentEngine {
     fn completion(completion: ProviderCompletion) -> Completion {
         Completion {
             completion_text: CompletionText::new(completion.text),
-            stop_reason: StopReasonText::new(completion.stop_reason),
+            stop_reason_text: StopReasonText::new(completion.stop_reason),
             token_usage: TokenUsage::new(
                 completion.prompt_tokens.map(PromptTokenCount::new),
                 completion.completion_tokens.map(CompletionTokenCount::new),
@@ -210,18 +210,18 @@ impl AgentEngine {
     fn resolve_rejection(error: ResolveError) -> CallRejection {
         match error {
             ResolveError::NoProviderConfigured => CallRejection {
-                reason: CallRejectionReason::NoProviderConfigured,
-                detail: RejectionDetail::new(
+                call_rejection_reason: CallRejectionReason::NoProviderConfigured,
+                rejection_detail: RejectionDetail::new(
                     "no provider configured and prompt named none".to_owned(),
                 ),
             },
             ResolveError::ProviderUnknown(name) => CallRejection {
-                reason: CallRejectionReason::NoProviderConfigured,
-                detail: RejectionDetail::new(format!("provider not in registry: {name}")),
+                call_rejection_reason: CallRejectionReason::NoProviderConfigured,
+                rejection_detail: RejectionDetail::new(format!("provider not in registry: {name}")),
             },
             ResolveError::SecretUnavailable(error) => CallRejection {
-                reason: CallRejectionReason::DaemonUnconfigured,
-                detail: RejectionDetail::new(format!("secret unavailable: {error}")),
+                call_rejection_reason: CallRejectionReason::DaemonUnconfigured,
+                rejection_detail: RejectionDetail::new(format!("secret unavailable: {error}")),
             },
         }
     }
@@ -229,16 +229,16 @@ impl AgentEngine {
     fn failure_rejection(failure: ProviderFailure) -> CallRejection {
         match failure {
             ProviderFailure::Unreachable(detail) => CallRejection {
-                reason: CallRejectionReason::ProviderUnreachable,
-                detail: RejectionDetail::new(detail),
+                call_rejection_reason: CallRejectionReason::ProviderUnreachable,
+                rejection_detail: RejectionDetail::new(detail),
             },
             ProviderFailure::ProviderRejected(detail) => CallRejection {
-                reason: CallRejectionReason::ProviderRejected,
-                detail: RejectionDetail::new(detail),
+                call_rejection_reason: CallRejectionReason::ProviderRejected,
+                rejection_detail: RejectionDetail::new(detail),
             },
             ProviderFailure::OutputModeUnsupported => CallRejection {
-                reason: CallRejectionReason::OutputModeUnsupported,
-                detail: RejectionDetail::new(
+                call_rejection_reason: CallRejectionReason::OutputModeUnsupported,
+                rejection_detail: RejectionDetail::new(
                     "provider does not support the requested output mode".to_owned(),
                 ),
             },
@@ -247,8 +247,8 @@ impl AgentEngine {
 
     fn invalid_nota_rejection(last_error: &str) -> CallRejection {
         CallRejection {
-            reason: CallRejectionReason::InvalidNotaOutput,
-            detail: RejectionDetail::new(format!(
+            call_rejection_reason: CallRejectionReason::InvalidNotaOutput,
+            rejection_detail: RejectionDetail::new(format!(
                 "model did not produce valid NOTA after {NOTA_OUTPUT_ATTEMPTS} attempts: {last_error}"
             )),
         }
@@ -256,8 +256,8 @@ impl AgentEngine {
 
     fn budget_exhausted_reply(&self, exhausted: triad_runtime::ContinuationExhausted) -> Output {
         Output::CallRejected(CallRejection {
-            reason: CallRejectionReason::ProviderRejected,
-            detail: RejectionDetail::new(format!(
+            call_rejection_reason: CallRejectionReason::ProviderRejected,
+            rejection_detail: RejectionDetail::new(format!(
                 "nexus continuation budget exhausted after {} steps (limit {})",
                 exhausted.completed_step_count(),
                 exhausted.limit().count()

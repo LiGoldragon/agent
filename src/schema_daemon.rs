@@ -151,11 +151,11 @@ impl<'engine> AgentMetaHandler<'engine> {
 
     fn configure_provider(self, configure: ConfigureProvider) -> meta_signal_agent::Output {
         let configuration = configure.into_payload();
-        let name = configuration.name.payload().clone();
+        let name = configuration.provider_name.payload().clone();
         self.engine.registry_mut().configure(ProviderEntry::new(
             name.clone(),
-            configuration.endpoint.into_payload(),
-            configuration.default_model.into_payload(),
+            configuration.endpoint_url.into_payload(),
+            configuration.model_name.into_payload(),
             configuration.secret_source.into(),
         ));
         meta_signal_agent::Output::ProviderConfigured(ProviderConfigured::new(
@@ -191,8 +191,8 @@ impl<'engine> AgentMetaHandler<'engine> {
 
     fn rejected(reason: OrderRejectionReason, detail: &str) -> meta_signal_agent::Output {
         meta_signal_agent::Output::OrderRejected(OrderRejection {
-            reason,
-            detail: RejectionDetail::new(detail.to_owned()),
+            order_rejection_reason: reason,
+            rejection_detail: RejectionDetail::new(detail.to_owned()),
         })
     }
 }

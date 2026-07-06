@@ -281,7 +281,7 @@ impl ProviderRegistry {
     }
 
     fn project_message(message: &ChatMessage) -> ProviderMessage {
-        ProviderMessage::new(message.role, message.text.payload().clone())
+        ProviderMessage::new(message.chat_role, message.user_text.payload().clone())
     }
 }
 

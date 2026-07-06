@@ -139,7 +139,7 @@ async fn fixture_provider_completes_a_call_offline() {
                 completion.completion_text.payload(),
                 "(FixtureCompletion ok)"
             );
-            assert_eq!(completion.stop_reason.payload(), "stop");
+            assert_eq!(completion.stop_reason_text.payload(), "stop");
         }
         other => panic!("expected a completion, got {other:?}"),
     }
@@ -157,7 +157,7 @@ async fn call_with_no_configured_provider_is_rejected() {
         .await;
     match output {
         Output::CallRejected(rejection) => {
-            assert_eq!(rejection.reason, CallRejectionReason::NoProviderConfigured);
+            assert_eq!(rejection.call_rejection_reason, CallRejectionReason::NoProviderConfigured);
         }
         other => panic!("expected a rejection, got {other:?}"),
     }
@@ -197,11 +197,11 @@ async fn nota_output_rejects_empty_document() {
         .await;
     match output {
         Output::CallRejected(rejection) => {
-            assert_eq!(rejection.reason, CallRejectionReason::InvalidNotaOutput);
+            assert_eq!(rejection.call_rejection_reason, CallRejectionReason::InvalidNotaOutput);
             assert!(
-                rejection.detail.payload().contains("expected exactly one"),
+                rejection.rejection_detail.payload().contains("expected exactly one"),
                 "unexpected rejection detail: {:?}",
-                rejection.detail
+                rejection.rejection_detail
             );
         }
         other => panic!("expected InvalidNotaOutput rejection, got {other:?}"),
@@ -231,11 +231,11 @@ async fn nota_output_rejects_multiple_root_objects() {
         .await;
     match output {
         Output::CallRejected(rejection) => {
-            assert_eq!(rejection.reason, CallRejectionReason::InvalidNotaOutput);
+            assert_eq!(rejection.call_rejection_reason, CallRejectionReason::InvalidNotaOutput);
             assert!(
-                rejection.detail.payload().contains("expected exactly one"),
+                rejection.rejection_detail.payload().contains("expected exactly one"),
                 "unexpected rejection detail: {:?}",
-                rejection.detail
+                rejection.rejection_detail
             );
         }
         other => panic!("expected InvalidNotaOutput rejection, got {other:?}"),
