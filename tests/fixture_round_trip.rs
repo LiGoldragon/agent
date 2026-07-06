@@ -133,8 +133,12 @@ async fn fixture_provider_completes_a_call_offline() {
         .await;
     match output {
         Output::Completed(completion) => {
-            // The fixture returns a valid NOTA verdict; the NOTA path validates it.
-            assert!(completion.completion_text.payload().contains("Verdict"));
+            // The fixture returns a valid generic NOTA expression; domain-specific
+            // response contracts belong to the caller prompt, not the provider fixture.
+            assert_eq!(
+                completion.completion_text.payload(),
+                "(FixtureCompletion ok)"
+            );
             assert_eq!(completion.stop_reason.payload(), "stop");
         }
         other => panic!("expected a completion, got {other:?}"),
