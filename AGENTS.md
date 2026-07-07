@@ -1,15 +1,12 @@
 # agent agent notes
 
-Read `/home/li/primary/AGENTS.md` first, then this repo's `INTENT.md` and
-`ARCHITECTURE.md`.
+Read this repo's `INTENT.md` and `ARCHITECTURE.md`.
 
 `agent` is the daemon of the agent triad — an LLM-API-call component that makes
 OpenAI-compatible provider HTTP API calls. It is NOT an agent harness (psyche
 Spirit `iucr`, `f8k7`); harness backends are deferred.
 
-Before editing daemon Rust, read `/home/li/primary/skills/component-triad.md`,
-`/home/li/primary/skills/actor-systems.md`, `/home/li/primary/skills/kameo.md`,
-and `/home/li/primary/skills/secrets.md`.
+Before editing daemon Rust, follow the component-triad, actor-system, Kameo, and secrets disciplines.
 
 Load-bearing rules for this repo:
 
