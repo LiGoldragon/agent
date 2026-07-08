@@ -431,16 +431,45 @@ mod live {
                     content: message.content().to_owned(),
                 });
             }
+            let parameter_policy = ChatCompletionParameterPolicy::for_model(call.model());
             Self {
                 model: call.model().to_owned(),
                 messages,
-                temperature: call.temperature(),
+                temperature: parameter_policy.temperature(call.temperature()),
                 max_tokens: call.maximum_output_tokens(),
                 reasoning_effort: call.reasoning_effort(),
                 thinking: call
                     .thinking_directive()
                     .map(|kind| ThinkingDirective { kind }),
             }
+        }
+    }
+
+    #[derive(Debug, Clone)]
+    struct ChatCompletionParameterPolicy {
+        model: String,
+    }
+
+    impl ChatCompletionParameterPolicy {
+        fn for_model(model: &str) -> Self {
+            Self {
+                model: model.to_owned(),
+            }
+        }
+
+        fn temperature(&self, requested: Option<f64>) -> Option<f64> {
+            if self.supports_temperature() {
+                requested
+            } else {
+                None
+            }
+        }
+
+        fn supports_temperature(&self) -> bool {
+            !(self.model.starts_with("gpt-5")
+                || self.model.starts_with("o1")
+                || self.model.starts_with("o3")
+                || self.model.starts_with("o4"))
         }
     }
 

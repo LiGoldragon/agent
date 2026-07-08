@@ -157,7 +157,10 @@ async fn call_with_no_configured_provider_is_rejected() {
         .await;
     match output {
         Output::CallRejected(rejection) => {
-            assert_eq!(rejection.call_rejection_reason, CallRejectionReason::NoProviderConfigured);
+            assert_eq!(
+                rejection.call_rejection_reason,
+                CallRejectionReason::NoProviderConfigured
+            );
         }
         other => panic!("expected a rejection, got {other:?}"),
     }
@@ -197,9 +200,15 @@ async fn nota_output_rejects_empty_document() {
         .await;
     match output {
         Output::CallRejected(rejection) => {
-            assert_eq!(rejection.call_rejection_reason, CallRejectionReason::InvalidNotaOutput);
+            assert_eq!(
+                rejection.call_rejection_reason,
+                CallRejectionReason::InvalidNotaOutput
+            );
             assert!(
-                rejection.rejection_detail.payload().contains("expected exactly one"),
+                rejection
+                    .rejection_detail
+                    .payload()
+                    .contains("expected exactly one"),
                 "unexpected rejection detail: {:?}",
                 rejection.rejection_detail
             );
@@ -231,9 +240,15 @@ async fn nota_output_rejects_multiple_root_objects() {
         .await;
     match output {
         Output::CallRejected(rejection) => {
-            assert_eq!(rejection.call_rejection_reason, CallRejectionReason::InvalidNotaOutput);
+            assert_eq!(
+                rejection.call_rejection_reason,
+                CallRejectionReason::InvalidNotaOutput
+            );
             assert!(
-                rejection.rejection_detail.payload().contains("expected exactly one"),
+                rejection
+                    .rejection_detail
+                    .payload()
+                    .contains("expected exactly one"),
                 "unexpected rejection detail: {:?}",
                 rejection.rejection_detail
             );
@@ -381,10 +396,38 @@ async fn local_openai_compatible_provider_omits_authorization_for_no_secret() {
     assert_eq!(captured.request_line, "POST /v1/chat/completions HTTP/1.1");
     assert_eq!(captured.authorization, None);
     assert_eq!(captured.body["model"], LOCAL_OPENAI_MODEL);
+    assert!(captured.body.get("temperature").is_none());
     assert!(captured.body.get("tools").is_none());
     assert!(captured.body.get("tool_choice").is_none());
     assert_eq!(captured.body["messages"][0]["role"], "system");
     assert_eq!(captured.body["messages"][1]["role"], "user");
+}
+
+#[cfg(feature = "live-provider")]
+#[tokio::test]
+async fn openai_compatible_provider_keeps_temperature_for_standard_models() {
+    let server = CapturingOpenAiServer::spawn();
+    let mut registry = ProviderRegistry::new();
+    registry.configure(ProviderEntry::new(
+        "mimo",
+        server.endpoint(),
+        "mimo-7b",
+        SecretSource::no_secret(),
+    ));
+    let call = registry
+        .resolve(&provider_prompt("mimo", "mimo-7b"), &LiteralKeySource)
+        .await
+        .expect("resolve standard provider");
+    let completion = agent::provider::OpenAiCompatibleProvider::new()
+        .complete(call)
+        .await
+        .expect("provider completion");
+    assert_eq!(completion.text, "(Verdict accepted)");
+
+    let captured = server.join();
+    assert_eq!(captured.request_line, "POST /v1/chat/completions HTTP/1.1");
+    assert_eq!(captured.body["model"], "mimo-7b");
+    assert_eq!(captured.body["temperature"], 0.0);
 }
 
 #[cfg(feature = "live-provider")]
@@ -415,6 +458,7 @@ async fn local_openai_compatible_provider_sends_configured_bearer_header() {
     assert_eq!(captured.request_line, "POST /v1/chat/completions HTTP/1.1");
     assert_eq!(captured.authorization.as_deref(), Some("Bearer test-key"));
     assert_eq!(captured.body["model"], LOCAL_OPENAI_MODEL);
+    assert!(captured.body.get("temperature").is_none());
     assert!(captured.body.get("tools").is_none());
     assert!(captured.body.get("tool_choice").is_none());
 }

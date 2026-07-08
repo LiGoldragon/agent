@@ -61,10 +61,10 @@ ProviderCompletionFuture`). Two implementations:
 - `OpenAiCompatibleProvider` (feature `live-provider`) — the reqwest-backed
   call. One client serves every configured provider; only endpoint, model, and
   authorization differ. It posts the OpenAI chat-completions body (system +
-  transcript, `temperature`, `max_tokens`, `response_format: json_object` when
-  the prompt's `OutputMode` is `JsonObject`) with a bearer token only when the
-  resolved authorization carries one. `NoSecret` sends no Authorization header
-  for trusted loopback OpenAI-compatible servers.
+  transcript, model-compatible optional parameters such as `temperature` and
+  `max_tokens`) with a bearer token only when the resolved authorization carries
+  one. `NoSecret` sends no Authorization header for trusted loopback
+  OpenAI-compatible servers.
 
 ## The provider registry — policy state
 
