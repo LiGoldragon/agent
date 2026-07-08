@@ -75,9 +75,10 @@ default), and resolves the secret source through a `KeySource`. The production
 `KeySource` is `SystemKeySource`, which supports `Environment`, `Gopass`, and
 `File` backends. The `NoSecret` source bypasses key resolution and is intended
 for a local OpenAI-compatible server such as `http://127.0.0.1:18080/v1` with
-model `gpt-5.5`; if that local server is started with its own API-key gate, use
-`Environment` or `File` instead. Tests inject a literal key source so a fixture
-call needs no process environment.
+model `gpt-5.4-mini` (the current local judge/eval default). The same endpoint
+may also advertise `gpt-5.5` for explicit fallback runs. If that local server is
+started with its own API-key gate, use `Environment` or `File` instead. Tests
+inject a literal key source so a fixture call needs no process environment.
 
 The registry is configured through the meta tier (`handle_meta_connection`
 decodes `meta_signal_agent::Input`, mutates the registry) and seeded at startup

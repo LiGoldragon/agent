@@ -35,7 +35,7 @@ const DEEPSEEK_KEY_HANDLE: &str = "DEEPSEEK_API_KEY";
 #[cfg(feature = "live-provider")]
 const LOCAL_OPENAI_PROVIDER: &str = "local-openai";
 #[cfg(feature = "live-provider")]
-const LOCAL_OPENAI_MODEL: &str = "gpt-5.5";
+const LOCAL_OPENAI_MODEL: &str = "gpt-5.4-mini";
 #[cfg(feature = "live-provider")]
 const DEEPSEEK_GOPASS_PATH: &str = "platform.deepseek.com/api-key";
 

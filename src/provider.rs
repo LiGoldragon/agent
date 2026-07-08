@@ -516,4 +516,23 @@ mod live {
         prompt_tokens: Option<u64>,
         completion_tokens: Option<u64>,
     }
+
+    #[cfg(test)]
+    mod tests {
+        use super::ChatCompletionParameterPolicy;
+
+        #[test]
+        fn gpt_five_four_mini_uses_reasoning_model_temperature_policy() {
+            let policy = ChatCompletionParameterPolicy::for_model("gpt-5.4-mini");
+
+            assert_eq!(policy.temperature(Some(0.0)), None);
+        }
+
+        #[test]
+        fn gpt_five_five_keeps_reasoning_model_temperature_policy() {
+            let policy = ChatCompletionParameterPolicy::for_model("gpt-5.5");
+
+            assert_eq!(policy.temperature(Some(0.0)), None);
+        }
+    }
 }
