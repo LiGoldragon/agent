@@ -74,7 +74,7 @@ fn configuration_writer_prebuilds_binary_archive_for_daemon_startup() {
 fn configuration_writer_accepts_local_provider_without_secret() {
     let sandbox = ConfigurationWriterSandbox::new();
     let request = format!(
-        "(AgentConfigurationWriteRequest ({} {} 384 {} [(ProviderSeed (local-openai http://127.0.0.1:18080/v1 gpt-5.5 NoSecret))] {}))",
+        "(AgentConfigurationWriteRequest ({} {} 384 {} [(ProviderSeed (local-openai http://127.0.0.1:18080/v1 gpt-5.4-mini NoSecret))] {}))",
         sandbox.ordinary_socket_path.display(),
         sandbox.meta_socket_path.display(),
         sandbox.database_path.display(),
@@ -99,7 +99,7 @@ fn configuration_writer_accepts_local_provider_without_secret() {
     );
     assert_eq!(
         configuration.bootstrap_providers()[0].default_model,
-        "gpt-5.5"
+        "gpt-5.4-mini"
     );
     assert!(matches!(
         configuration.bootstrap_providers()[0].secret_source,
