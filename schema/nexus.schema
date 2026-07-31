@@ -13,32 +13,20 @@
 ;; `EffectCompleted(ProviderOutcome)` and Nexus replies to Signal.
 
 {
-  OrdinaryInput signal-agent:lib:Input
-  OrdinaryOutput signal-agent:lib:Output
-  Prompt signal-agent:lib:Prompt
-  Completion signal-agent:lib:Completion
-  CallRejection signal-agent:lib:CallRejection
+  signal-agent.lib.[Prompt Completion CallRejection]
 }
-[SignalArrived EffectCompleted]
-[ReplyToSignal CommandEffect Continue]
+[SignalArrived.Prompt EffectCompleted.ProviderOutcome]
+[ReplyToSignal.ProviderOutcome CommandEffect.ProviderCallCommand Continue.NexusWork]
 {
-  SignalArrived OrdinaryInput
-  EffectCompleted ProviderOutcome
-
-  ReplyToSignal OrdinaryOutput
-  CommandEffect ProviderCallCommand
-  Continue NexusWork
-
   ;; The one external effect: call a configured provider's chat-completions API.
-  ProviderCallCommand [(CallProvider CallProvider)]
-  CallProvider Prompt
+  ProviderCallCommand.[CallProvider.Prompt]
 
   ;; The effect's typed outcome: a completion, or a typed rejection (no provider,
   ;; unreachable, provider rejected, output mode unsupported).
-  ProviderOutcome [(Completed Completed) (Rejected Rejected)]
-  Completed Completion
-  Rejected CallRejection
+  ProviderOutcome.[Completed.Completion Rejected.CallRejection]
 
-  NexusWork [(SignalArrived SignalArrived) (EffectCompleted EffectCompleted)]
-  NexusAction [(ReplyToSignal ReplyToSignal) (CommandEffect CommandEffect) (Continue Continue)]
+  NexusWork.[SignalArrived.Prompt EffectCompleted.ProviderOutcome]
+  NexusAction.[ReplyToSignal.ProviderOutcome CommandEffect.ProviderCallCommand Continue.NexusWork]
 }
+{}
+{}

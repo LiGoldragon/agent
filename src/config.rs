@@ -1,16 +1,16 @@
 //! The agent daemon's binary rkyv startup configuration.
 //!
 //! Loaded as a binary rkyv file from the single argv argument (the
-//! single-argument rule). The daemon never parses NOTA, configuration included;
-//! a deploy/bootstrap tool encodes typed NOTA into this binary form before it
+//! single-argument rule). The daemon never parses DOTOS, configuration included;
+//! a deploy/bootstrap tool encodes typed DOTOS into this binary form before it
 //! reaches the daemon.
 //!
 //! The configuration carries the two socket paths (ordinary + meta) and the
 //! durable database path the uniform `BindingSurface` trait requires. The
 //! provider registry is populated through the meta tier after startup, never
-//! from a flag and never from inline NOTA. An optional `bootstrap_providers`
+//! from a flag and never from inline DOTOS. An optional `bootstrap_providers`
 //! seed lets a deploy tool ship the daemon a starting registry in the binary
-//! startup message — still binary, still typed, no NOTA parsed by the daemon.
+//! startup message — still binary, still typed, no DOTOS parsed by the daemon.
 
 use std::path::Path;
 

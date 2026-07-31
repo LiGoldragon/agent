@@ -96,9 +96,9 @@ from the binary configuration's `bootstrap_providers`.
 
 `agent-daemon` takes exactly one argument: a binary rkyv `AgentDaemonConfiguration`
 (ordinary socket, meta socket + mode, database path, optional provider seeds). It
-rejects inline NOTA and `.nota` paths and never parses NOTA. The `agent` CLI is
-the thin text-to-Signal client: one NOTA `Input` argument, `AGENT_SOCKET` from
-the environment, binary frame to the daemon, NOTA reply on stdout.
+rejects inline DOTOS and `.dotos` paths and never parses DOTOS. The `agent` CLI is
+the thin text-to-Signal client: one DOTOS `Input` argument, `AGENT_SOCKET` from
+the environment, binary frame to the daemon, DOTOS reply on stdout.
 
 ## Deferred
 

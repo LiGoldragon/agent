@@ -23,7 +23,9 @@ use tokio::io::AsyncWriteExt;
 #[rustfmt::skip]
 use triad_runtime::{FrameBody, FrameError, LengthPrefixedCodec};
 #[rustfmt::skip]
-use signal_agent::schema::lib::{Input, Output, SignalFrameError};
+use signal_agent::schema::lib::{
+    ContractMarker, EngineRefusal, Input, Output, SignalFrameError,
+};
 #[rustfmt::skip]
 /// The lane one decoded working `Input` runs on. `Immediate` is the
 /// single-turn engine ask every component starts with; `Staged` runs
@@ -214,7 +216,7 @@ impl<Daemon: ComponentDaemon> DaemonCommand<Daemon> {
                     .map_err(DaemonError::Configuration)?;
                 Ok(configuration)
             }
-            ComponentArgument::InlineNota(_) | ComponentArgument::NotaFile(_) => {
+            ComponentArgument::InlineDotos(_) | ComponentArgument::DotosFile(_) => {
                 Err(DaemonError::Argument(ArgumentError::ExpectedSignalFile))
             }
         }
@@ -437,6 +439,13 @@ impl<Daemon: ComponentDaemon> Message<MetaConnection> for EngineActor<Daemon> {
     }
 }
 #[rustfmt::skip]
+/// One refused working turn: the component's typed error for the
+/// daemon-side log plus the wire refusal written to the caller.
+struct RefusedWorkingTurn<DaemonError> {
+    error: DaemonError,
+    refusal: EngineRefusal,
+}
+#[rustfmt::skip]
 /// The generated runtime struct holds an `ActorRef` to the engine
 /// actor. Its `handle_connection` IS the async decode -> ask -> encode
 /// spine; the engine state lives behind the actor mailbox. The advance
@@ -456,24 +465,54 @@ impl<Daemon: ComponentDaemon> GeneratedDaemonRuntime<Daemon> {
         }
     }
     /// Translate a kameo `SendError` from an engine `ask` into the
-    /// component's typed `Error` via `EngineRequestError`.
-    fn engine_send_error<Request>(
+    /// refused turn the spine answers with: the component's typed
+    /// `Error` for the daemon side, plus the wire refusal the
+    /// caller receives. A handler error is the engine rejecting
+    /// the request; every mailbox-layer failure is the engine
+    /// being unavailable.
+    fn engine_ask_refused<Request>(
         error: SendError<Request, Daemon::Error>,
-    ) -> Daemon::Error {
+    ) -> RefusedWorkingTurn<Daemon::Error> {
         match error {
-            SendError::HandlerError(error) => error,
+            SendError::HandlerError(error) => {
+                let refusal = EngineRefusal::rejected(error.to_string());
+                RefusedWorkingTurn {
+                    error,
+                    refusal,
+                }
+            }
             SendError::ActorNotRunning(_) => {
-                EngineRequestError::new("engine actor is not running").into()
+                Self::engine_unavailable("engine actor is not running")
             }
             SendError::ActorStopped => {
-                EngineRequestError::new("engine actor stopped before replying").into()
+                Self::engine_unavailable("engine actor stopped before replying")
             }
             SendError::MailboxFull(_) => {
-                EngineRequestError::new("engine actor mailbox is full").into()
+                Self::engine_unavailable("engine actor mailbox is full")
             }
             SendError::Timeout(_) => {
-                EngineRequestError::new("engine actor request timed out").into()
+                Self::engine_unavailable("engine actor request timed out")
             }
+        }
+    }
+    fn engine_unavailable(detail: &str) -> RefusedWorkingTurn<Daemon::Error> {
+        RefusedWorkingTurn {
+            error: EngineRequestError::new(detail).into(),
+            refusal: EngineRefusal::unavailable(detail.to_string()),
+        }
+    }
+    /// Best-effort refusal write: the engine failure outranks any
+    /// secondary transport failure, which the caller experiences
+    /// as the closed exchange it already handles today.
+    async fn write_refusal_frame<Stream>(
+        transport: &mut WorkingTransport<'_, Stream>,
+        refusal: EngineRefusal,
+    )
+    where
+        Stream: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
+    {
+        if let Ok(frame) = refusal.encode_bound_frame() {
+            let _ = transport.write_frame(frame).await;
         }
     }
     async fn handle_working_connection<Stream>(
@@ -485,18 +524,18 @@ impl<Daemon: ComponentDaemon> GeneratedDaemonRuntime<Daemon> {
     {
         let mut transport = WorkingTransport::new(&mut connection);
         let frame = transport.read_frame().await?;
-        let (_route, input) = Input::decode_signal_frame(&frame)?;
+        let (exchange, input) = ContractMarker::decode_single_request(&frame)?;
         let context = *transport.context();
-        let output = match Daemon::working_input_lane(&input) {
+        let turn = match Daemon::working_input_lane(&input) {
             WorkingInputLane::Immediate => {
                 match self.engine.ask(WorkingInput { input, context }).await {
-                    Ok(output) => output,
-                    Err(error) => return Err(Self::engine_send_error(error)),
+                    Ok(output) => Ok(output),
+                    Err(error) => Err(Self::engine_ask_refused(error)),
                 }
             }
             WorkingInputLane::Staged => {
                 let _advance_turn = self.advance_gate.lock().await;
-                let staged = match self
+                match self
                     .engine
                     .ask(StageWorkingInput {
                         input,
@@ -504,25 +543,37 @@ impl<Daemon: ComponentDaemon> GeneratedDaemonRuntime<Daemon> {
                     })
                     .await
                 {
-                    Ok(staged) => staged,
-                    Err(error) => return Err(Self::engine_send_error(error)),
-                };
-                match staged {
-                    StagedWorkingReply::Completed(output) => output,
-                    StagedWorkingReply::Awaiting(mut advance) => {
+                    Ok(StagedWorkingReply::Completed(output)) => Ok(output),
+                    Ok(StagedWorkingReply::Awaiting(mut advance)) => {
                         advance.resolve().await;
                         match self.engine.ask(ConcludeWorkingInput { advance }).await {
-                            Ok(output) => output,
-                            Err(error) => {
-                                return Err(Self::engine_send_error(error));
-                            }
+                            Ok(output) => Ok(output),
+                            Err(error) => Err(Self::engine_ask_refused(error)),
                         }
                     }
+                    Err(error) => Err(Self::engine_ask_refused(error)),
                 }
             }
         };
-        transport.write_frame(output.encode_signal_frame()?).await?;
-        Ok(())
+        match turn {
+            Ok(output) => {
+                match output.encode_reply_frame(exchange) {
+                    Ok(reply) => {
+                        transport.write_frame(reply).await?;
+                        Ok(())
+                    }
+                    Err(error) => {
+                        let refusal = EngineRefusal::unavailable(error.to_string());
+                        Self::write_refusal_frame(&mut transport, refusal).await;
+                        Err(error.into())
+                    }
+                }
+            }
+            Err(refused) => {
+                Self::write_refusal_frame(&mut transport, refused.refusal).await;
+                Err(refused.error)
+            }
+        }
     }
     async fn handle_meta_connection(
         &self,

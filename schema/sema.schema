@@ -9,16 +9,17 @@
 ;; uniform three-plane shape.
 
 {}
-[WriteInput ReadInput]
-[WriteOutput ReadOutput]
+[WriteInput.SemaWriteInput ReadInput.SemaReadInput]
+[WriteOutput.SemaWriteOutput ReadOutput.SemaReadOutput]
 {
-  WriteInput [(NoDurableState NoDurableState)]
-  NoDurableState Stateless
+  SemaWriteInput.[NoDurableState.Stateless]
 
-  ReadInput [(NoDurableState NoDurableState)]
+  SemaReadInput.[NoDurableState.Stateless]
 
-  WriteOutput [(Stateless Stateless)]
-  ReadOutput [(Stateless Stateless)]
+  SemaWriteOutput.[NoDurableState.Stateless]
+  SemaReadOutput.[NoDurableState.Stateless]
 
-  Stateless { }
+  Stateless.{ }
 }
+{}
+{}

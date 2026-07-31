@@ -3,7 +3,7 @@
 //! witness that the Signal -> Nexus -> CallProvider effect -> reply path works.
 //!
 //! Real-network coverage is gated behind a key being present (see
-//! `live_deepseek_flash_returns_valid_nota_with_gopass_key`), so CI stays
+//! `live_deepseek_flash_returns_valid_dotos_with_gopass_key`), so CI stays
 //! offline.
 
 use agent::provider::{
@@ -14,7 +14,7 @@ use agent::registry::{
 };
 use agent::{AgentEngine, FixtureProvider};
 #[cfg(feature = "live-provider")]
-use nota::Document;
+use dotos::Document;
 #[cfg(feature = "live-provider")]
 use serde_json::Value;
 use signal_agent::{
@@ -92,14 +92,14 @@ fn guardian_prompt(provider: Option<&str>) -> Prompt {
     Prompt::new(
         Some(SystemText::new("You judge intent.".to_owned())),
         ChatTranscript::new(vec![ChatMessage::user(
-            "Reply exactly with this NOTA expression: (Verdict accepted)",
+            "Reply exactly with this DOTOS expression: (Verdict accepted)",
         )]),
         PromptOptions::new(
             Some(ModelName::new(DEEPSEEK_MODEL.to_owned())),
             provider.map(|name| ProviderName::new(name.to_owned())),
             Some(TemperatureMilli::new(0)),
             Some(MaximumOutputTokens::new(64)),
-            OutputMode::Nota,
+            OutputMode::Dotos,
             None,
             None,
         ),
@@ -116,7 +116,7 @@ fn provider_prompt(provider: &str, model: &str) -> Prompt {
             Some(ProviderName::new(provider.to_owned())),
             Some(TemperatureMilli::new(0)),
             Some(MaximumOutputTokens::new(64)),
-            OutputMode::Nota,
+            OutputMode::Dotos,
             None,
             None,
         ),
@@ -133,7 +133,7 @@ async fn fixture_provider_completes_a_call_offline() {
         .await;
     match output {
         Output::Completed(completion) => {
-            // The fixture returns a valid generic NOTA expression; domain-specific
+            // The fixture returns a valid generic DOTOS expression; domain-specific
             // response contracts belong to the caller prompt, not the provider fixture.
             assert_eq!(
                 completion.completion_text.payload(),
@@ -178,7 +178,7 @@ async fn default_provider_is_used_when_prompt_names_none() {
 }
 
 #[tokio::test]
-async fn nota_output_rejects_empty_document() {
+async fn dotos_output_rejects_empty_document() {
     let mut engine = AgentEngine::new(
         {
             let mut registry = ProviderRegistry::new();
@@ -202,7 +202,7 @@ async fn nota_output_rejects_empty_document() {
         Output::CallRejected(rejection) => {
             assert_eq!(
                 rejection.call_rejection_reason,
-                CallRejectionReason::InvalidNotaOutput
+                CallRejectionReason::InvalidDotosOutput
             );
             assert!(
                 rejection
@@ -213,12 +213,12 @@ async fn nota_output_rejects_empty_document() {
                 rejection.rejection_detail
             );
         }
-        other => panic!("expected InvalidNotaOutput rejection, got {other:?}"),
+        other => panic!("expected InvalidDotosOutput rejection, got {other:?}"),
     }
 }
 
 #[tokio::test]
-async fn nota_output_rejects_multiple_root_objects() {
+async fn dotos_output_rejects_multiple_root_objects() {
     let mut engine = AgentEngine::new(
         {
             let mut registry = ProviderRegistry::new();
@@ -242,7 +242,7 @@ async fn nota_output_rejects_multiple_root_objects() {
         Output::CallRejected(rejection) => {
             assert_eq!(
                 rejection.call_rejection_reason,
-                CallRejectionReason::InvalidNotaOutput
+                CallRejectionReason::InvalidDotosOutput
             );
             assert!(
                 rejection
@@ -253,7 +253,7 @@ async fn nota_output_rejects_multiple_root_objects() {
                 rejection.rejection_detail
             );
         }
-        other => panic!("expected InvalidNotaOutput rejection, got {other:?}"),
+        other => panic!("expected InvalidDotosOutput rejection, got {other:?}"),
     }
 }
 
@@ -274,7 +274,7 @@ async fn registry_resolves_prompt_to_a_provider_call() {
     // The prompt named a DeepSeek model; that overrides the provider's
     // default model.
     assert_eq!(call.model(), DEEPSEEK_MODEL);
-    assert!(call.is_nota());
+    assert!(call.is_dotos());
 }
 
 #[tokio::test]
@@ -469,7 +469,7 @@ async fn local_openai_compatible_provider_sends_configured_bearer_header() {
 /// live-provider`, this exercises the real HTTPS call.
 #[cfg(feature = "live-provider")]
 #[tokio::test]
-async fn live_deepseek_flash_returns_valid_nota_with_gopass_key() {
+async fn live_deepseek_flash_returns_valid_dotos_with_gopass_key() {
     let key_available = std::process::Command::new("gopass")
         .arg("show")
         .arg("-o")
@@ -500,10 +500,10 @@ async fn live_deepseek_flash_returns_valid_nota_with_gopass_key() {
     match output {
         Output::Completed(completion) => {
             let text = completion.completion_text.payload();
-            Document::parse(text).expect("live DeepSeek completion must be valid NOTA");
+            Document::parse(text).expect("live DeepSeek completion must be valid DOTOS");
             assert!(
                 text.contains("Verdict"),
-                "live completion had valid NOTA but not the requested verdict: {text}"
+                "live completion had valid DOTOS but not the requested verdict: {text}"
             );
         }
         other => panic!("live call did not complete: {other:?}"),

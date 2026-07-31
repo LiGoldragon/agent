@@ -10,246 +10,219 @@ pub type Boolean = bool;
 pub type Path = std::string::String;
 
 #[rustfmt::skip]
-#[cfg(feature = "nota-text")]
-pub use nota::{NotaDecodeError, NotaEncode, NotaSource};
+#[cfg(feature = "dotos-text")]
+pub use dotos::{DotosDecodeError, DotosEncode, DotosSource};
 
 #[rustfmt::skip]
 #[cfg_attr(
-    feature = "nota-text",
-    derive(nota::NotaDecode, nota::NotaDecodeTraced, nota::NotaEncode)
+    feature = "dotos-text",
+    derive(dotos::DotosDecode, dotos::DotosDecodeTraced, dotos::DotosEncode)
 )]
 #[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize, Clone, Debug, PartialEq, Eq)]
-pub enum WriteInput {
-    NoDurableState(NoDurableState),
+pub enum SemaWriteInput {
+    NoDurableState(Stateless),
 }
 
 #[rustfmt::skip]
 #[cfg_attr(
-    feature = "nota-text",
-    derive(nota::NotaDecode, nota::NotaDecodeTraced, nota::NotaEncode)
+    feature = "dotos-text",
+    derive(dotos::DotosDecode, dotos::DotosDecodeTraced, dotos::DotosEncode)
 )]
 #[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize, Clone, Debug, PartialEq, Eq)]
-pub struct NoDurableState(Stateless);
-
-#[rustfmt::skip]
-#[cfg_attr(
-    feature = "nota-text",
-    derive(nota::NotaDecode, nota::NotaDecodeTraced, nota::NotaEncode)
-)]
-#[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize, Clone, Debug, PartialEq, Eq)]
-pub enum ReadInput {
-    NoDurableState(NoDurableState),
+pub enum SemaReadInput {
+    NoDurableState(Stateless),
 }
 
 #[rustfmt::skip]
 #[cfg_attr(
-    feature = "nota-text",
-    derive(nota::NotaDecode, nota::NotaDecodeTraced, nota::NotaEncode)
+    feature = "dotos-text",
+    derive(dotos::DotosDecode, dotos::DotosDecodeTraced, dotos::DotosEncode)
 )]
 #[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize, Clone, Debug, PartialEq, Eq)]
-pub enum WriteOutput {
-    Stateless(Stateless),
+pub enum SemaWriteOutput {
+    NoDurableState(Stateless),
 }
 
 #[rustfmt::skip]
 #[cfg_attr(
-    feature = "nota-text",
-    derive(nota::NotaDecode, nota::NotaDecodeTraced, nota::NotaEncode)
+    feature = "dotos-text",
+    derive(dotos::DotosDecode, dotos::DotosDecodeTraced, dotos::DotosEncode)
 )]
 #[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize, Clone, Debug, PartialEq, Eq)]
-pub enum ReadOutput {
-    Stateless(Stateless),
+pub enum SemaReadOutput {
+    NoDurableState(Stateless),
 }
 
 #[rustfmt::skip]
 #[cfg_attr(
-    feature = "nota-text",
-    derive(nota::NotaDecode, nota::NotaDecodeTraced, nota::NotaEncode)
+    feature = "dotos-text",
+    derive(dotos::DotosDecode, dotos::DotosDecodeTraced, dotos::DotosEncode)
 )]
 #[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Stateless {}
 
 #[rustfmt::skip]
 #[cfg_attr(
-    feature = "nota-text",
-    derive(nota::NotaDecode, nota::NotaDecodeTraced, nota::NotaEncode)
+    feature = "dotos-text",
+    derive(dotos::DotosDecode, dotos::DotosDecodeTraced, dotos::DotosEncode)
 )]
 #[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum Input {
-    WriteInput(WriteInput),
-    ReadInput(ReadInput),
+    WriteInput(SemaWriteInput),
+    ReadInput(SemaReadInput),
 }
 
 #[rustfmt::skip]
 #[cfg_attr(
-    feature = "nota-text",
-    derive(nota::NotaDecode, nota::NotaDecodeTraced, nota::NotaEncode)
+    feature = "dotos-text",
+    derive(dotos::DotosDecode, dotos::DotosDecodeTraced, dotos::DotosEncode)
 )]
 #[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum Output {
-    WriteOutput(WriteOutput),
-    ReadOutput(ReadOutput),
+    WriteOutput(SemaWriteOutput),
+    ReadOutput(SemaReadOutput),
 }
 
 #[rustfmt::skip]
-impl NoDurableState {
-    pub fn new(payload: Stateless) -> Self {
-        Self(payload)
-    }
-    pub fn payload(&self) -> &Stateless {
-        &self.0
-    }
-    pub fn into_payload(self) -> Stateless {
-        self.0
-    }
-}
-#[rustfmt::skip]
-impl From<Stateless> for NoDurableState {
-    fn from(payload: Stateless) -> Self {
-        Self::new(payload)
-    }
-}
-
-#[rustfmt::skip]
-impl WriteInput {
+impl SemaWriteInput {
     pub fn no_durable_state(payload: Stateless) -> Self {
-        Self::NoDurableState(NoDurableState::new(payload))
+        Self::NoDurableState(payload)
     }
 }
 
 #[rustfmt::skip]
-impl ReadInput {
+impl SemaReadInput {
     pub fn no_durable_state(payload: Stateless) -> Self {
-        Self::NoDurableState(NoDurableState::new(payload))
+        Self::NoDurableState(payload)
     }
 }
 
 #[rustfmt::skip]
-impl WriteOutput {
-    pub fn stateless(payload: Stateless) -> Self {
-        Self::Stateless(payload)
+impl SemaWriteOutput {
+    pub fn no_durable_state(payload: Stateless) -> Self {
+        Self::NoDurableState(payload)
     }
 }
 
 #[rustfmt::skip]
-impl ReadOutput {
-    pub fn stateless(payload: Stateless) -> Self {
-        Self::Stateless(payload)
+impl SemaReadOutput {
+    pub fn no_durable_state(payload: Stateless) -> Self {
+        Self::NoDurableState(payload)
     }
 }
 
 #[rustfmt::skip]
 impl Input {
-    pub fn write_input(payload: WriteInput) -> Self {
+    pub fn write_input(payload: SemaWriteInput) -> Self {
         Self::WriteInput(payload)
     }
-    pub fn read_input(payload: ReadInput) -> Self {
+    pub fn read_input(payload: SemaReadInput) -> Self {
         Self::ReadInput(payload)
     }
 }
 
 #[rustfmt::skip]
 impl Output {
-    pub fn write_output(payload: WriteOutput) -> Self {
+    pub fn write_output(payload: SemaWriteOutput) -> Self {
         Self::WriteOutput(payload)
     }
-    pub fn read_output(payload: ReadOutput) -> Self {
+    pub fn read_output(payload: SemaReadOutput) -> Self {
         Self::ReadOutput(payload)
     }
 }
 
 #[rustfmt::skip]
-impl From<NoDurableState> for WriteInput {
-    fn from(payload: NoDurableState) -> Self {
+impl From<Stateless> for SemaWriteInput {
+    fn from(payload: Stateless) -> Self {
         Self::NoDurableState(payload)
     }
 }
 
 #[rustfmt::skip]
-impl From<NoDurableState> for ReadInput {
-    fn from(payload: NoDurableState) -> Self {
+impl From<Stateless> for SemaReadInput {
+    fn from(payload: Stateless) -> Self {
         Self::NoDurableState(payload)
     }
 }
 
 #[rustfmt::skip]
-impl From<Stateless> for WriteOutput {
+impl From<Stateless> for SemaWriteOutput {
     fn from(payload: Stateless) -> Self {
-        Self::Stateless(payload)
+        Self::NoDurableState(payload)
     }
 }
 
 #[rustfmt::skip]
-impl From<Stateless> for ReadOutput {
+impl From<Stateless> for SemaReadOutput {
     fn from(payload: Stateless) -> Self {
-        Self::Stateless(payload)
+        Self::NoDurableState(payload)
     }
 }
 
 #[rustfmt::skip]
-impl From<WriteInput> for Input {
-    fn from(payload: WriteInput) -> Self {
+impl From<SemaWriteInput> for Input {
+    fn from(payload: SemaWriteInput) -> Self {
         Self::WriteInput(payload)
     }
 }
 
 #[rustfmt::skip]
-impl From<ReadInput> for Input {
-    fn from(payload: ReadInput) -> Self {
+impl From<SemaReadInput> for Input {
+    fn from(payload: SemaReadInput) -> Self {
         Self::ReadInput(payload)
     }
 }
 
 #[rustfmt::skip]
-impl From<WriteOutput> for Output {
-    fn from(payload: WriteOutput) -> Self {
+impl From<SemaWriteOutput> for Output {
+    fn from(payload: SemaWriteOutput) -> Self {
         Self::WriteOutput(payload)
     }
 }
 
 #[rustfmt::skip]
-impl From<ReadOutput> for Output {
-    fn from(payload: ReadOutput) -> Self {
+impl From<SemaReadOutput> for Output {
+    fn from(payload: SemaReadOutput) -> Self {
         Self::ReadOutput(payload)
     }
 }
 
 #[rustfmt::skip]
-#[cfg(feature = "nota-text")]
+#[cfg(feature = "dotos-text")]
 impl std::str::FromStr for Input {
-    type Err = NotaDecodeError;
+    type Err = DotosDecodeError;
     fn from_str(source: &str) -> Result<Self, Self::Err> {
-        NotaSource::new(source).parse::<Self>()
+        DotosSource::new(source).parse::<Self>()
     }
 }
 #[rustfmt::skip]
-#[cfg(feature = "nota-text")]
+#[cfg(feature = "dotos-text")]
 impl std::fmt::Display for Input {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter.write_str(&<Self as NotaEncode>::to_nota(self))
+        formatter.write_str(&<Self as DotosEncode>::to_dotos(self))
     }
 }
 
 #[rustfmt::skip]
-#[cfg(feature = "nota-text")]
+#[cfg(feature = "dotos-text")]
 impl std::str::FromStr for Output {
-    type Err = NotaDecodeError;
+    type Err = DotosDecodeError;
     fn from_str(source: &str) -> Result<Self, Self::Err> {
-        NotaSource::new(source).parse::<Self>()
+        DotosSource::new(source).parse::<Self>()
     }
 }
 #[rustfmt::skip]
-#[cfg(feature = "nota-text")]
+#[cfg(feature = "dotos-text")]
 impl std::fmt::Display for Output {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter.write_str(&<Self as NotaEncode>::to_nota(self))
+        formatter.write_str(&<Self as DotosEncode>::to_dotos(self))
     }
 }
 
 #[rustfmt::skip]
 #[cfg_attr(
-    feature = "nota-text",
-    derive(nota::NotaDecode, nota::NotaDecodeTraced, nota::NotaEncode)
+    feature = "dotos-text",
+    derive(dotos::DotosDecode, dotos::DotosDecodeTraced, dotos::DotosEncode)
 )]
 #[derive(
     rkyv::Archive,
@@ -261,23 +234,23 @@ impl std::fmt::Display for Output {
     PartialEq,
     Eq,
 )]
-pub enum WriteInputRoute {
+pub enum SemaWriteInputRoute {
     NoDurableState,
 }
 
 #[rustfmt::skip]
-impl WriteInput {
-    pub fn route(&self) -> WriteInputRoute {
+impl SemaWriteInput {
+    pub fn route(&self) -> SemaWriteInputRoute {
         match self {
-            Self::NoDurableState(_) => WriteInputRoute::NoDurableState,
+            Self::NoDurableState(_) => SemaWriteInputRoute::NoDurableState,
         }
     }
 }
 
 #[rustfmt::skip]
 #[cfg_attr(
-    feature = "nota-text",
-    derive(nota::NotaDecode, nota::NotaDecodeTraced, nota::NotaEncode)
+    feature = "dotos-text",
+    derive(dotos::DotosDecode, dotos::DotosDecodeTraced, dotos::DotosEncode)
 )]
 #[derive(
     rkyv::Archive,
@@ -289,23 +262,23 @@ impl WriteInput {
     PartialEq,
     Eq,
 )]
-pub enum ReadInputRoute {
+pub enum SemaReadInputRoute {
     NoDurableState,
 }
 
 #[rustfmt::skip]
-impl ReadInput {
-    pub fn route(&self) -> ReadInputRoute {
+impl SemaReadInput {
+    pub fn route(&self) -> SemaReadInputRoute {
         match self {
-            Self::NoDurableState(_) => ReadInputRoute::NoDurableState,
+            Self::NoDurableState(_) => SemaReadInputRoute::NoDurableState,
         }
     }
 }
 
 #[rustfmt::skip]
 #[cfg_attr(
-    feature = "nota-text",
-    derive(nota::NotaDecode, nota::NotaDecodeTraced, nota::NotaEncode)
+    feature = "dotos-text",
+    derive(dotos::DotosDecode, dotos::DotosDecodeTraced, dotos::DotosEncode)
 )]
 #[derive(
     rkyv::Archive,
@@ -317,23 +290,23 @@ impl ReadInput {
     PartialEq,
     Eq,
 )]
-pub enum WriteOutputRoute {
-    Stateless,
+pub enum SemaWriteOutputRoute {
+    NoDurableState,
 }
 
 #[rustfmt::skip]
-impl WriteOutput {
-    pub fn route(&self) -> WriteOutputRoute {
+impl SemaWriteOutput {
+    pub fn route(&self) -> SemaWriteOutputRoute {
         match self {
-            Self::Stateless(_) => WriteOutputRoute::Stateless,
+            Self::NoDurableState(_) => SemaWriteOutputRoute::NoDurableState,
         }
     }
 }
 
 #[rustfmt::skip]
 #[cfg_attr(
-    feature = "nota-text",
-    derive(nota::NotaDecode, nota::NotaDecodeTraced, nota::NotaEncode)
+    feature = "dotos-text",
+    derive(dotos::DotosDecode, dotos::DotosDecodeTraced, dotos::DotosEncode)
 )]
 #[derive(
     rkyv::Archive,
@@ -345,23 +318,23 @@ impl WriteOutput {
     PartialEq,
     Eq,
 )]
-pub enum ReadOutputRoute {
-    Stateless,
+pub enum SemaReadOutputRoute {
+    NoDurableState,
 }
 
 #[rustfmt::skip]
-impl ReadOutput {
-    pub fn route(&self) -> ReadOutputRoute {
+impl SemaReadOutput {
+    pub fn route(&self) -> SemaReadOutputRoute {
         match self {
-            Self::Stateless(_) => ReadOutputRoute::Stateless,
+            Self::NoDurableState(_) => SemaReadOutputRoute::NoDurableState,
         }
     }
 }
 
 #[rustfmt::skip]
 #[cfg_attr(
-    feature = "nota-text",
-    derive(nota::NotaDecode, nota::NotaDecodeTraced, nota::NotaEncode)
+    feature = "dotos-text",
+    derive(dotos::DotosDecode, dotos::DotosDecodeTraced, dotos::DotosEncode)
 )]
 #[derive(
     rkyv::Archive,
@@ -374,10 +347,10 @@ impl ReadOutput {
     Eq,
 )]
 pub enum SemaObjectName {
-    WriteInput(WriteInputRoute),
-    ReadInput(ReadInputRoute),
-    WriteOutput(WriteOutputRoute),
-    ReadOutput(ReadOutputRoute),
+    WriteInput(SemaWriteInputRoute),
+    ReadInput(SemaReadInputRoute),
+    WriteOutput(SemaWriteOutputRoute),
+    ReadOutput(SemaReadOutputRoute),
     Started,
     Stopped,
     WriteApplied,
@@ -389,22 +362,24 @@ impl SemaObjectName {
         match self {
             Self::WriteInput(route) => {
                 match route {
-                    WriteInputRoute::NoDurableState => "SemaWriteInputNoDurableState",
+                    SemaWriteInputRoute::NoDurableState => "SemaWriteInputNoDurableState",
                 }
             }
             Self::ReadInput(route) => {
                 match route {
-                    ReadInputRoute::NoDurableState => "SemaReadInputNoDurableState",
+                    SemaReadInputRoute::NoDurableState => "SemaReadInputNoDurableState",
                 }
             }
             Self::WriteOutput(route) => {
                 match route {
-                    WriteOutputRoute::Stateless => "SemaWriteOutputStateless",
+                    SemaWriteOutputRoute::NoDurableState => {
+                        "SemaWriteOutputNoDurableState"
+                    }
                 }
             }
             Self::ReadOutput(route) => {
                 match route {
-                    ReadOutputRoute::Stateless => "SemaReadOutputStateless",
+                    SemaReadOutputRoute::NoDurableState => "SemaReadOutputNoDurableState",
                 }
             }
             Self::Started => "SemaStarted",
@@ -417,8 +392,8 @@ impl SemaObjectName {
 
 #[rustfmt::skip]
 #[cfg_attr(
-    feature = "nota-text",
-    derive(nota::NotaDecode, nota::NotaDecodeTraced, nota::NotaEncode)
+    feature = "dotos-text",
+    derive(dotos::DotosDecode, dotos::DotosDecodeTraced, dotos::DotosEncode)
 )]
 #[derive(
     rkyv::Archive,
@@ -435,8 +410,8 @@ pub enum ObjectName {
 }
 #[rustfmt::skip]
 #[cfg_attr(
-    feature = "nota-text",
-    derive(nota::NotaDecode, nota::NotaDecodeTraced, nota::NotaEncode)
+    feature = "dotos-text",
+    derive(dotos::DotosDecode, dotos::DotosDecodeTraced, dotos::DotosEncode)
 )]
 #[derive(
     rkyv::Archive,
@@ -472,8 +447,8 @@ impl TraceEvent {
 
 #[rustfmt::skip]
 #[cfg_attr(
-    feature = "nota-text",
-    derive(nota::NotaDecode, nota::NotaDecodeTraced, nota::NotaEncode)
+    feature = "dotos-text",
+    derive(dotos::DotosDecode, dotos::DotosDecodeTraced, dotos::DotosEncode)
 )]
 #[derive(
     rkyv::Archive,
@@ -527,52 +502,52 @@ impl<Root> Sema<Root> {
 #[rustfmt::skip]
 #[allow(clippy::module_inception)]
 pub mod sema {
-    pub type WriteInput = super::WriteInput;
-    pub type WriteOutput = super::WriteOutput;
-    pub type ReadInput = super::ReadInput;
-    pub type ReadOutput = super::ReadOutput;
+    pub type WriteInput = super::SemaWriteInput;
+    pub type WriteOutput = super::SemaWriteOutput;
+    pub type ReadInput = super::SemaReadInput;
+    pub type ReadOutput = super::SemaReadOutput;
     pub type Sema<Root> = super::Sema<Root>;
 }
 
 #[rustfmt::skip]
-impl WriteInput {
+impl SemaWriteInput {
     pub fn with_origin_route(self, origin_route: OriginRoute) -> sema::Sema<Self> {
         sema::Sema::new(origin_route, self)
     }
 }
 
 #[rustfmt::skip]
-impl WriteOutput {
+impl SemaWriteOutput {
     pub fn with_origin_route(self, origin_route: OriginRoute) -> sema::Sema<Self> {
         sema::Sema::new(origin_route, self)
     }
 }
 
 #[rustfmt::skip]
-impl ReadInput {
+impl SemaReadInput {
     pub fn with_origin_route(self, origin_route: OriginRoute) -> sema::Sema<Self> {
         sema::Sema::new(origin_route, self)
     }
 }
 
 #[rustfmt::skip]
-impl ReadOutput {
+impl SemaReadOutput {
     pub fn with_origin_route(self, origin_route: OriginRoute) -> sema::Sema<Self> {
         sema::Sema::new(origin_route, self)
     }
 }
 
 #[rustfmt::skip]
-impl triad_runtime::SemaWriteInput for WriteInput {}
+impl triad_runtime::SemaWriteInput for SemaWriteInput {}
 
 #[rustfmt::skip]
-impl triad_runtime::SemaWriteOutput for WriteOutput {}
+impl triad_runtime::SemaWriteOutput for SemaWriteOutput {}
 
 #[rustfmt::skip]
-impl triad_runtime::SemaReadInput for ReadInput {}
+impl triad_runtime::SemaReadInput for SemaReadInput {}
 
 #[rustfmt::skip]
-impl triad_runtime::SemaReadOutput for ReadOutput {}
+impl triad_runtime::SemaReadOutput for SemaReadOutput {}
 
 #[rustfmt::skip]
 #[derive(Clone, Debug, PartialEq, Eq)]

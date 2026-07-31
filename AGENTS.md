@@ -14,7 +14,7 @@ Load-bearing rules for this repo:
   the engine mailbox. Never a blocking await inside an actor handler.
 - API keys are daemon-resolved secret-source references, never hardcoded; the
   secret value is never logged or persisted.
-- The daemon takes exactly one binary rkyv argument and never parses NOTA.
+- The daemon takes exactly one binary rkyv argument and never parses DOTOS.
 - Edit `schema/nexus.schema` / `schema/sema.schema` and regenerate
   (`AGENT_UPDATE_SCHEMA_ARTIFACTS=1 cargo build`); never hand-edit
   `src/schema/*.rs`.

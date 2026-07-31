@@ -13,7 +13,7 @@
 //! the only place the daemon touches the network, and it does so off the engine
 //! mailbox through the async effect seam, never blocking a handler.
 
-use nota::Document;
+use dotos::Document;
 use signal_agent::{
     CallRejection, CallRejectionReason, Completion, CompletionText, CompletionTokenCount,
     OperationKind, Output, OutputMode, PromptTokenCount, RejectionDetail, RequestUnimplemented,
@@ -23,12 +23,11 @@ use signal_agent::{
 use crate::provider::{Provider, ProviderCall, ProviderCompletion, ProviderFailure};
 use crate::registry::{KeySource, ProviderEntry, ProviderRegistry, ResolveError, SystemKeySource};
 use crate::schema::nexus::{
-    self as nexus_schema, CommandEffect, NexusAction, NexusEngine, NexusWork, ProviderCallCommand,
-    ProviderOutcome,
+    self as nexus_schema, NexusAction, NexusEngine, NexusWork, ProviderCallCommand, ProviderOutcome,
 };
 use crate::schema::sema::{
-    self as sema_schema, ReadInput as SemaReadInput, ReadOutput as SemaReadOutput, SemaEngine,
-    Stateless, WriteInput as SemaWriteInput, WriteOutput as SemaWriteOutput,
+    self as sema_schema, SemaEngine, SemaReadInput, SemaReadOutput, SemaWriteInput,
+    SemaWriteOutput, Stateless,
 };
 
 /// The agent daemon's engine. `Provider` is boxed so the fixture and the live
@@ -87,10 +86,20 @@ impl AgentEngine {
     /// generated `NexusEngine::execute` owns the recursive runner loop; the
     /// engine supplies the decision and the async provider effect.
     pub async fn handle(&mut self, input: signal_agent::Input) -> Output {
-        let work = NexusWork::signal_arrived(input).with_origin_route(Self::forward_origin_route());
+        let prompt = match input {
+            signal_agent::Input::Call(call) => call.into_payload(),
+            signal_agent::Input::StreamCall(_) => {
+                return Self::unimplemented_reply(OperationKind::StreamCall);
+            }
+            signal_agent::Input::CancelStream(_) => {
+                return Self::unimplemented_reply(OperationKind::CancelStream);
+            }
+        };
+        let work =
+            NexusWork::signal_arrived(prompt).with_origin_route(Self::forward_origin_route());
         let action = self.execute(work).await.into_root();
         match action {
-            NexusAction::ReplyToSignal(output) => output.into_payload(),
+            NexusAction::ReplyToSignal(outcome) => Self::output_from_outcome(outcome),
             other => Output::CallRejected(CallRejection {
                 call_rejection_reason: CallRejectionReason::ProviderRejected,
                 rejection_detail: RejectionDetail::new(format!(
@@ -100,46 +109,37 @@ impl AgentEngine {
         }
     }
 
-    /// The decision for an arrived ordinary `Input`.
-    fn decide_signal(&self, input: signal_agent::Input) -> NexusAction {
-        match input {
-            signal_agent::Input::Call(call) => {
-                NexusAction::command_effect(ProviderCallCommand::call_provider(call.into_payload()))
-            }
-            signal_agent::Input::StreamCall(_) => {
-                NexusAction::reply_to_signal(Output::RequestUnimplemented(RequestUnimplemented {
-                    operation_kind: OperationKind::StreamCall,
-                    unimplemented_reason: UnimplementedReason::NotInPrototypeScope,
-                }))
-            }
-            signal_agent::Input::CancelStream(_) => {
-                NexusAction::reply_to_signal(Output::RequestUnimplemented(RequestUnimplemented {
-                    operation_kind: OperationKind::CancelStream,
-                    unimplemented_reason: UnimplementedReason::NotInPrototypeScope,
-                }))
-            }
+    /// The decision for an arrived ordinary call prompt.
+    fn decide_signal(&self, prompt: signal_agent::Prompt) -> NexusAction {
+        NexusAction::command_effect(ProviderCallCommand::call_provider(prompt))
+    }
+
+    /// Turn a completed provider call into the local Nexus reply payload.
+    fn decide_effect_completed(&self, outcome: ProviderOutcome) -> NexusAction {
+        NexusAction::reply_to_signal(outcome)
+    }
+
+    /// Convert the local provider outcome back into the public signal contract.
+    fn output_from_outcome(outcome: ProviderOutcome) -> Output {
+        match outcome {
+            ProviderOutcome::Completed(completion) => Output::Completed(completion),
+            ProviderOutcome::Rejected(rejection) => Output::CallRejected(rejection),
         }
     }
 
-    /// Turn a completed provider call into the Signal `Output` to reply with.
-    fn decide_effect_completed(&self, outcome: ProviderOutcome) -> NexusAction {
-        match outcome {
-            ProviderOutcome::Completed(completion) => {
-                NexusAction::reply_to_signal(Output::Completed(completion.into_payload()))
-            }
-            ProviderOutcome::Rejected(rejection) => {
-                NexusAction::reply_to_signal(Output::CallRejected(rejection.into_payload()))
-            }
-        }
+    fn unimplemented_reply(operation_kind: OperationKind) -> Output {
+        Output::RequestUnimplemented(RequestUnimplemented {
+            operation_kind,
+            unimplemented_reason: UnimplementedReason::NotInPrototypeScope,
+        })
     }
 
     /// Run the one effect the agent declares: call the configured provider. This
     /// resolves the prompt against the registry (provider, model, secret source),
     /// makes the OpenAI-compatible call through the `Provider`, and lifts the
     /// result into a typed `ProviderOutcome`.
-    async fn run_provider_effect(&self, command: CommandEffect) -> ProviderOutcome {
-        let ProviderCallCommand::CallProvider(prompt) = command.into_payload();
-        let prompt = prompt.into_payload();
+    async fn run_provider_effect(&self, command: ProviderCallCommand) -> ProviderOutcome {
+        let ProviderCallCommand::CallProvider(prompt) = command;
         match self.registry.resolve(&prompt, self.keys.as_ref()).await {
             Ok(call) => self.complete_call(call).await,
             Err(error) => ProviderOutcome::rejected(Self::resolve_rejection(error)),
@@ -149,7 +149,7 @@ impl AgentEngine {
     async fn complete_call(&self, call: ProviderCall) -> ProviderOutcome {
         match call.output_mode() {
             OutputMode::FreeText => self.complete_once(call).await,
-            OutputMode::Nota => self.complete_nota(call).await,
+            OutputMode::Dotos => self.complete_dotos(call).await,
         }
     }
 
@@ -161,36 +161,36 @@ impl AgentEngine {
         }
     }
 
-    /// The NOTA path: the model emits NOTA directly. Inject the NOTA instruction,
-    /// validate the completion parses as NOTA, and retry once with the parse error
-    /// before rejecting with `InvalidNotaOutput`. NOTA has no provider-level
+    /// The DOTOS path: the model emits DOTOS directly. Inject the DOTOS instruction,
+    /// validate the completion parses as DOTOS, and retry once with the parse error
+    /// before rejecting with `InvalidDotosOutput`. DOTOS has no provider-level
     /// constrained-decode mode, so validate-and-retry is the reliability mechanism.
     /// This runs inside the async `run_effect` seam, off the engine mailbox.
-    async fn complete_nota(&self, call: ProviderCall) -> ProviderOutcome {
-        let mut attempt = call.with_nota_instruction();
+    async fn complete_dotos(&self, call: ProviderCall) -> ProviderOutcome {
+        let mut attempt = call.with_dotos_instruction();
         let mut last_error = String::new();
-        for _ in 0..NOTA_OUTPUT_ATTEMPTS {
+        for _ in 0..DOTOS_OUTPUT_ATTEMPTS {
             match self.provider.complete(attempt.clone()).await {
-                Ok(completion) => match Self::validate_nota_completion(completion.text.as_str()) {
+                Ok(completion) => match Self::validate_dotos_completion(completion.text.as_str()) {
                     Ok(_) => return ProviderOutcome::completed(Self::completion(completion)),
                     Err(error) => {
                         last_error = error;
-                        attempt = attempt.with_nota_correction(&completion.text, &last_error);
+                        attempt = attempt.with_dotos_correction(&completion.text, &last_error);
                     }
                 },
                 Err(failure) => return ProviderOutcome::rejected(Self::failure_rejection(failure)),
             }
         }
-        ProviderOutcome::rejected(Self::invalid_nota_rejection(&last_error))
+        ProviderOutcome::rejected(Self::invalid_dotos_rejection(&last_error))
     }
 
-    fn validate_nota_completion(text: &str) -> Result<(), String> {
+    fn validate_dotos_completion(text: &str) -> Result<(), String> {
         let document = Document::parse(text).map_err(|error| error.to_string())?;
         if document.holds_root_objects() == 1 {
             Ok(())
         } else {
             Err(format!(
-                "expected exactly one NOTA root object, found {}",
+                "expected exactly one DOTOS root object, found {}",
                 document.holds_root_objects()
             ))
         }
@@ -245,17 +245,20 @@ impl AgentEngine {
         }
     }
 
-    fn invalid_nota_rejection(last_error: &str) -> CallRejection {
+    fn invalid_dotos_rejection(last_error: &str) -> CallRejection {
         CallRejection {
-            call_rejection_reason: CallRejectionReason::InvalidNotaOutput,
+            call_rejection_reason: CallRejectionReason::InvalidDotosOutput,
             rejection_detail: RejectionDetail::new(format!(
-                "model did not produce valid NOTA after {NOTA_OUTPUT_ATTEMPTS} attempts: {last_error}"
+                "model did not produce valid DOTOS after {DOTOS_OUTPUT_ATTEMPTS} attempts: {last_error}"
             )),
         }
     }
 
-    fn budget_exhausted_reply(&self, exhausted: triad_runtime::ContinuationExhausted) -> Output {
-        Output::CallRejected(CallRejection {
+    fn budget_exhausted_outcome(
+        &self,
+        exhausted: triad_runtime::ContinuationExhausted,
+    ) -> ProviderOutcome {
+        ProviderOutcome::rejected(CallRejection {
             call_rejection_reason: CallRejectionReason::ProviderRejected,
             rejection_detail: RejectionDetail::new(format!(
                 "nexus continuation budget exhausted after {} steps (limit {})",
@@ -273,24 +276,34 @@ impl AgentEngine {
     }
 }
 
-/// How many times the NOTA path asks the model for valid NOTA: the first attempt
-/// plus one correction retry. NOTA has no provider-level constrained-decode mode,
+/// How many times the DOTOS path asks the model for valid DOTOS: the first attempt
+/// plus one correction retry. DOTOS has no provider-level constrained-decode mode,
 /// so a bounded validate-and-retry is the reliability mechanism.
-const NOTA_OUTPUT_ATTEMPTS: usize = 2;
+const DOTOS_OUTPUT_ATTEMPTS: usize = 2;
 
 impl NexusEngine for AgentEngine {
+    fn run_effect(
+        &mut self,
+        input: ProviderCallCommand,
+    ) -> impl std::future::Future<Output = ProviderOutcome> + Send + '_ {
+        self.run_provider_effect(input)
+    }
+
+    fn budget_exhausted_reply(
+        &self,
+        exhausted: triad_runtime::ContinuationExhausted,
+    ) -> ProviderOutcome {
+        self.budget_exhausted_outcome(exhausted)
+    }
+
     fn decide(
         &mut self,
         input: nexus_schema::nexus::Nexus<nexus_schema::nexus::Work>,
     ) -> nexus_schema::nexus::Nexus<nexus_schema::nexus::Action> {
         let origin_route = input.origin_route();
         let action = match input.into_root() {
-            NexusWork::SignalArrived(signal_input) => {
-                self.decide_signal(signal_input.into_payload())
-            }
-            NexusWork::EffectCompleted(outcome) => {
-                self.decide_effect_completed(outcome.into_payload())
-            }
+            NexusWork::SignalArrived(signal_input) => self.decide_signal(signal_input),
+            NexusWork::EffectCompleted(outcome) => self.decide_effect_completed(outcome),
         };
         action.with_origin_route(origin_route)
     }
@@ -304,7 +317,7 @@ impl NexusEngine for AgentEngine {
         let mut budget = triad_runtime::ContinuationLimit::default().budget();
         loop {
             if let Err(exhausted) = budget.spend_next_step() {
-                return NexusAction::reply_to_signal(self.budget_exhausted_reply(exhausted))
+                return NexusAction::reply_to_signal(self.budget_exhausted_outcome(exhausted))
                     .with_origin_route(origin_route);
             }
             self.trace_nexus_entered();
@@ -317,7 +330,7 @@ impl NexusEngine for AgentEngine {
                 NexusAction::CommandEffect(effect) => {
                     if let Err(exhausted) = budget.spend_next_step() {
                         return NexusAction::reply_to_signal(
-                            self.budget_exhausted_reply(exhausted),
+                            self.budget_exhausted_outcome(exhausted),
                         )
                         .with_origin_route(origin_route);
                     }
@@ -325,7 +338,7 @@ impl NexusEngine for AgentEngine {
                     work = NexusWork::effect_completed(outcome).with_origin_route(origin_route);
                 }
                 NexusAction::Continue(continuation) => {
-                    work = continuation.into_payload().with_origin_route(origin_route);
+                    work = continuation.with_origin_route(origin_route);
                 }
             }
         }
@@ -341,7 +354,7 @@ impl SemaEngine for AgentEngine {
         input: sema_schema::sema::Sema<SemaWriteInput>,
     ) -> sema_schema::sema::Sema<SemaWriteOutput> {
         let origin_route = input.origin_route();
-        sema_schema::sema::Sema::new(origin_route, SemaWriteOutput::Stateless(Stateless {}))
+        sema_schema::sema::Sema::new(origin_route, SemaWriteOutput::NoDurableState(Stateless {}))
     }
 
     fn observe_inner(
@@ -349,6 +362,6 @@ impl SemaEngine for AgentEngine {
         input: sema_schema::sema::Sema<SemaReadInput>,
     ) -> sema_schema::sema::Sema<SemaReadOutput> {
         let origin_route = input.origin_route();
-        sema_schema::sema::Sema::new(origin_route, SemaReadOutput::Stateless(Stateless {}))
+        sema_schema::sema::Sema::new(origin_route, SemaReadOutput::NoDurableState(Stateless {}))
     }
 }

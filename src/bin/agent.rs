@@ -1,7 +1,7 @@
 //! `agent` — the thin CLI client for the agent daemon.
 //!
-//! Takes exactly one NOTA argument naming a `signal_agent::Input` request,
-//! sends it to the daemon over `AGENT_SOCKET`, and prints the reply as NOTA.
+//! Takes exactly one DOTOS argument naming a `signal_agent::Input` request,
+//! sends it to the daemon over `AGENT_SOCKET`, and prints the reply as DOTOS.
 
 use agent::client::CommandLine;
 

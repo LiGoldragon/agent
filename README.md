@@ -14,8 +14,8 @@ server. Secrets are never hardcoded and never logged.
 
 - `agent-daemon` — the long-lived process. One binary rkyv configuration
   argument; binds an ordinary (working) socket and a `0o600` meta socket.
-- `agent` — the thin CLI: one NOTA `signal_agent::Input` argument, `AGENT_SOCKET`
-  from the environment, NOTA reply on stdout.
+- `agent` — the thin CLI: one DOTOS `signal_agent::Input` argument, `AGENT_SOCKET`
+  from the environment, DOTOS reply on stdout.
 
 Build offline with the fixture provider (default). The reqwest-backed real call
 is behind `--features live-provider`; the live-network test gates on a key.

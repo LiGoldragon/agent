@@ -36,11 +36,11 @@ pub struct ProviderCall {
     thinking_mode: Option<ThinkingMode>,
 }
 
-/// The instruction the daemon folds into the system message for `OutputMode::Nota`:
-/// the model must emit exactly one valid NOTA expression. NOTA has no provider-level
+/// The instruction the daemon folds into the system message for `OutputMode::Dotos`:
+/// the model must emit exactly one valid DOTOS expression. DOTOS has no provider-level
 /// constrained-decode mode (unlike JSON's `response_format`), so the daemon instructs,
-/// then validates the completion parses as NOTA and retries once before rejecting.
-const NOTA_OUTPUT_INSTRUCTION: &str = "Respond with exactly one valid NOTA s-expression and nothing else. NOTA uses bracket forms: parenthesised records like (Head field ...), bracketed strings like [free text], and bare camelCase or kebab-case tokens. Do not use quotation marks, markdown fences, or any prose outside the expression.";
+/// then validates the completion parses as DOTOS and retries once before rejecting.
+const DOTOS_OUTPUT_INSTRUCTION: &str = "Respond with exactly one valid DOTOS s-expression and nothing else. DOTOS uses bracket forms: parenthesised records like (Head field ...), bracketed strings like [free text], and bare camelCase or kebab-case tokens. Do not use quotation marks, markdown fences, or any prose outside the expression.";
 
 impl ProviderCall {
     #[allow(clippy::too_many_arguments)]
@@ -94,8 +94,8 @@ impl ProviderCall {
         self.output_mode
     }
 
-    pub fn is_nota(&self) -> bool {
-        matches!(self.output_mode, OutputMode::Nota)
+    pub fn is_dotos(&self) -> bool {
+        matches!(self.output_mode, OutputMode::Dotos)
     }
 
     pub fn temperature(&self) -> Option<f64> {
@@ -125,12 +125,12 @@ impl ProviderCall {
         }
     }
 
-    /// A copy of this call with the NOTA-output instruction folded into the system
-    /// message — used for `OutputMode::Nota` so the model emits NOTA directly.
-    pub fn with_nota_instruction(&self) -> Self {
+    /// A copy of this call with the DOTOS-output instruction folded into the system
+    /// message — used for `OutputMode::Dotos` so the model emits DOTOS directly.
+    pub fn with_dotos_instruction(&self) -> Self {
         let system = match &self.system {
-            Some(existing) => format!("{existing}\n\n{NOTA_OUTPUT_INSTRUCTION}"),
-            None => NOTA_OUTPUT_INSTRUCTION.to_owned(),
+            Some(existing) => format!("{existing}\n\n{DOTOS_OUTPUT_INSTRUCTION}"),
+            None => DOTOS_OUTPUT_INSTRUCTION.to_owned(),
         };
         Self {
             system: Some(system),
@@ -139,8 +139,8 @@ impl ProviderCall {
     }
 
     /// A copy of this call extended with the model's invalid previous answer and a
-    /// correction turn — the single retry the daemon makes when NOTA validation fails.
-    pub fn with_nota_correction(&self, previous: &str, parse_error: &str) -> Self {
+    /// correction turn — the single retry the daemon makes when DOTOS validation fails.
+    pub fn with_dotos_correction(&self, previous: &str, parse_error: &str) -> Self {
         let mut messages = self.messages.clone();
         messages.push(ProviderMessage::new(
             ChatRole::Assistant,
@@ -149,7 +149,7 @@ impl ProviderCall {
         messages.push(ProviderMessage::new(
             ChatRole::User,
             format!(
-                "That response was not valid NOTA ({parse_error}). Reply with exactly one valid NOTA expression and nothing else."
+                "That response was not valid DOTOS ({parse_error}). Reply with exactly one valid DOTOS expression and nothing else."
             ),
         ));
         Self {
@@ -309,7 +309,7 @@ impl FixtureProvider {
             .map(|message| message.content())
             .unwrap_or("");
         let text = match call.output_mode() {
-            OutputMode::Nota => "(FixtureCompletion ok)".to_owned(),
+            OutputMode::Dotos => "(FixtureCompletion ok)".to_owned(),
             OutputMode::FreeText => format!("fixture completion for: {last_user}"),
         };
         ProviderCompletion {

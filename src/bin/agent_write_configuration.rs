@@ -1,7 +1,7 @@
-//! `agent-write-configuration` — encode typed NOTA into daemon startup rkyv.
+//! `agent-write-configuration` — encode typed DOTOS into daemon startup rkyv.
 //!
 //! This is the deploy/bootstrap text edge. `agent-daemon` itself still takes
-//! exactly one binary rkyv configuration file and never parses NOTA.
+//! exactly one binary rkyv configuration file and never parses DOTOS.
 
 use std::{
     fs,
@@ -12,8 +12,8 @@ use agent::{
     AgentDaemonConfiguration, ConfigurationError, ProviderSeed as RuntimeProviderSeed,
     registry::SecretSource as RuntimeSecretSource,
 };
+use dotos::{DotosDecode, DotosDecodeError, DotosEncode, DotosSource};
 use meta_signal_agent::SecretSource as ConfigurationWriterSecretSource;
-use nota::{NotaDecode, NotaDecodeError, NotaEncode, NotaSource};
 use thiserror::Error;
 use triad_runtime::{ArgumentError, ComponentArgument, ComponentCommand};
 
@@ -32,7 +32,7 @@ struct AgentConfigurationWriterInputSource {
     text: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, NotaDecode)]
+#[derive(Debug, Clone, PartialEq, Eq, DotosDecode)]
 struct AgentConfigurationWriteRequest {
     ordinary_socket_path: ConfigurationWriterPath,
     meta_socket_path: ConfigurationWriterPath,
@@ -42,18 +42,18 @@ struct AgentConfigurationWriteRequest {
     output_path: ConfigurationWriterPath,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, NotaDecode)]
+#[derive(Debug, Clone, PartialEq, Eq, DotosDecode)]
 enum AgentConfigurationWriterInput {
     AgentConfigurationWriteRequest(AgentConfigurationWriteRequest),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, NotaDecode, NotaEncode)]
+#[derive(Debug, Clone, PartialEq, Eq, DotosDecode, DotosEncode)]
 struct ConfigurationWriterPath(String);
 
-#[derive(Debug, Clone, PartialEq, Eq, NotaDecode, NotaEncode)]
+#[derive(Debug, Clone, PartialEq, Eq, DotosDecode, DotosEncode)]
 struct ConfigurationWriterSocketMode(u32);
 
-#[derive(Debug, Clone, PartialEq, Eq, NotaDecode, NotaEncode)]
+#[derive(Debug, Clone, PartialEq, Eq, DotosDecode, DotosEncode)]
 enum ProviderSeed {
     ProviderSeed(
         ConfigurationWriterProviderName,
@@ -63,16 +63,16 @@ enum ProviderSeed {
     ),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, NotaDecode, NotaEncode)]
+#[derive(Debug, Clone, PartialEq, Eq, DotosDecode, DotosEncode)]
 struct ConfigurationWriterProviderName(String);
 
-#[derive(Debug, Clone, PartialEq, Eq, NotaDecode, NotaEncode)]
+#[derive(Debug, Clone, PartialEq, Eq, DotosDecode, DotosEncode)]
 struct ConfigurationWriterEndpoint(String);
 
-#[derive(Debug, Clone, PartialEq, Eq, NotaDecode, NotaEncode)]
+#[derive(Debug, Clone, PartialEq, Eq, DotosDecode, DotosEncode)]
 struct ConfigurationWriterModelName(String);
 
-#[derive(Debug, Clone, PartialEq, Eq, NotaEncode)]
+#[derive(Debug, Clone, PartialEq, Eq, DotosEncode)]
 enum AgentConfigurationWriteOutput {
     AgentConfigurationWritten(ConfigurationWriterPath),
 }
@@ -88,22 +88,22 @@ impl AgentConfigurationWriterCli {
         let source = self.source()?;
         let request = source.parse_request()?;
         let output = request.write()?;
-        println!("{}", output.to_nota());
+        println!("{}", output.to_dotos());
         Ok(())
     }
 
     fn source(
         &self,
     ) -> Result<AgentConfigurationWriterInputSource, AgentConfigurationWriterCliError> {
-        match self.command.nota_argument()? {
-            ComponentArgument::InlineNota(argument) => Ok(
+        match self.command.dotos_argument()? {
+            ComponentArgument::InlineDotos(argument) => Ok(
                 AgentConfigurationWriterInputSource::new(argument.into_string()),
             ),
-            ComponentArgument::NotaFile(file) => {
+            ComponentArgument::DotosFile(file) => {
                 let path = file.into_path();
                 fs::read_to_string(&path)
                     .map(AgentConfigurationWriterInputSource::new)
-                    .map_err(|source| AgentConfigurationWriterCliError::ReadNotaFile {
+                    .map_err(|source| AgentConfigurationWriterCliError::ReadDotosFile {
                         path,
                         source,
                     })
@@ -122,8 +122,8 @@ impl AgentConfigurationWriterInputSource {
         Self { text }
     }
 
-    fn parse_request(&self) -> Result<AgentConfigurationWriteRequest, NotaDecodeError> {
-        NotaSource::new(&self.text)
+    fn parse_request(&self) -> Result<AgentConfigurationWriteRequest, DotosDecodeError> {
+        DotosSource::new(&self.text)
             .parse::<AgentConfigurationWriterInput>()
             .map(AgentConfigurationWriterInput::into_request)
     }
@@ -217,8 +217,8 @@ enum AgentConfigurationWriterCliError {
     #[error(transparent)]
     Argument(#[from] ArgumentError),
 
-    #[error("read NOTA file {}: {source}", path.display())]
-    ReadNotaFile {
+    #[error("read DOTOS file {}: {source}", path.display())]
+    ReadDotosFile {
         path: PathBuf,
         source: std::io::Error,
     },
@@ -230,7 +230,7 @@ enum AgentConfigurationWriterCliError {
     UnsupportedSignalFile { path: PathBuf },
 
     #[error(transparent)]
-    Decode(#[from] NotaDecodeError),
+    Decode(#[from] DotosDecodeError),
 
     #[error(transparent)]
     Archive(#[from] ConfigurationError),

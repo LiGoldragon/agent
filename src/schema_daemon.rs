@@ -110,12 +110,13 @@ impl ComponentDaemon for AgentDaemon {
         )
         .await
         .map_err(|_| Error::MetaRequestReadTimedOut)??;
-        let (_route, input) = meta_signal_agent::Input::decode_signal_frame(body.bytes())?;
+        let (exchange, input) =
+            meta_signal_agent::ContractMarker::decode_single_request(body.bytes())?;
         let reply = AgentMetaHandler::new(engine).handle(input);
         codec
             .write_body_async(
                 connection.stream_mut(),
-                &FrameBody::new(reply.encode_signal_frame()?),
+                &FrameBody::new(reply.encode_reply_frame(exchange)?),
             )
             .await?;
         connection.stream_mut().flush().await?;

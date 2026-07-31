@@ -28,7 +28,7 @@ impl ConfigurationWriterSandbox {
 
     fn request(&self) -> String {
         format!(
-            "(AgentConfigurationWriteRequest ({} {} 384 {} [(ProviderSeed (criomos-local http://prometheus.goldragon.criome:11434/v1 gemma-4-26b-a4b (Gopass platform.deepseek.com/api-key)))] {}))",
+            "AgentConfigurationWriteRequest.{{{} {} 384 {} [ProviderSeed.{{criomos-local http://prometheus.goldragon.criome:11434/v1 gemma-4-26b-a4b Gopass.platform.deepseek.com/api-key}}] {}}}",
             self.ordinary_socket_path.display(),
             self.meta_socket_path.display(),
             self.database_path.display(),
@@ -56,7 +56,7 @@ fn configuration_writer_prebuilds_binary_archive_for_daemon_startup() {
     assert_eq!(
         String::from_utf8_lossy(&output.stdout).trim(),
         format!(
-            "(AgentConfigurationWritten {})",
+            "AgentConfigurationWritten.{}",
             sandbox.output_path().display()
         )
     );
@@ -74,7 +74,7 @@ fn configuration_writer_prebuilds_binary_archive_for_daemon_startup() {
 fn configuration_writer_accepts_local_provider_without_secret() {
     let sandbox = ConfigurationWriterSandbox::new();
     let request = format!(
-        "(AgentConfigurationWriteRequest ({} {} 384 {} [(ProviderSeed (local-openai http://127.0.0.1:18080/v1 gpt-5.4-mini NoSecret))] {}))",
+        "AgentConfigurationWriteRequest.{{{} {} 384 {} [ProviderSeed.{{local-openai http://127.0.0.1:18080/v1 gpt-5.4-mini NoSecret}}] {}}}",
         sandbox.ordinary_socket_path.display(),
         sandbox.meta_socket_path.display(),
         sandbox.database_path.display(),

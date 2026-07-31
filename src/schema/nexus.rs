@@ -10,10 +10,6 @@ pub type Boolean = bool;
 pub type Path = std::string::String;
 
 #[rustfmt::skip]
-pub use signal_agent::schema::lib::Input as OrdinaryInput;
-#[rustfmt::skip]
-pub use signal_agent::schema::lib::Output as OrdinaryOutput;
-#[rustfmt::skip]
 pub use signal_agent::schema::lib::Prompt as Prompt;
 #[rustfmt::skip]
 pub use signal_agent::schema::lib::Completion as Completion;
@@ -21,482 +17,266 @@ pub use signal_agent::schema::lib::Completion as Completion;
 pub use signal_agent::schema::lib::CallRejection as CallRejection;
 
 #[rustfmt::skip]
-#[cfg(feature = "nota-text")]
-pub use nota::{NotaDecodeError, NotaEncode, NotaSource};
+#[cfg(feature = "dotos-text")]
+pub use dotos::{DotosDecodeError, DotosEncode, DotosSource};
 
 #[rustfmt::skip]
 #[cfg_attr(
-    feature = "nota-text",
-    derive(nota::NotaDecode, nota::NotaDecodeTraced, nota::NotaEncode)
-)]
-#[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize, Clone, Debug, PartialEq, Eq)]
-pub struct SignalArrived(OrdinaryInput);
-
-#[rustfmt::skip]
-#[cfg_attr(
-    feature = "nota-text",
-    derive(nota::NotaDecode, nota::NotaDecodeTraced, nota::NotaEncode)
-)]
-#[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize, Clone, Debug, PartialEq, Eq)]
-pub struct EffectCompleted(ProviderOutcome);
-
-#[rustfmt::skip]
-#[cfg_attr(
-    feature = "nota-text",
-    derive(nota::NotaDecode, nota::NotaDecodeTraced, nota::NotaEncode)
-)]
-#[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize, Clone, Debug, PartialEq, Eq)]
-pub struct ReplyToSignal(OrdinaryOutput);
-
-#[rustfmt::skip]
-#[cfg_attr(
-    feature = "nota-text",
-    derive(nota::NotaDecode, nota::NotaDecodeTraced, nota::NotaEncode)
-)]
-#[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize, Clone, Debug, PartialEq, Eq)]
-pub struct CommandEffect(ProviderCallCommand);
-
-#[rustfmt::skip]
-#[cfg_attr(
-    feature = "nota-text",
-    derive(nota::NotaDecode, nota::NotaDecodeTraced, nota::NotaEncode)
-)]
-#[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize, Clone, Debug, PartialEq, Eq)]
-pub struct Continue(NexusWork);
-
-#[rustfmt::skip]
-#[cfg_attr(
-    feature = "nota-text",
-    derive(nota::NotaDecode, nota::NotaDecodeTraced, nota::NotaEncode)
+    feature = "dotos-text",
+    derive(dotos::DotosDecode, dotos::DotosDecodeTraced, dotos::DotosEncode)
 )]
 #[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum ProviderCallCommand {
-    CallProvider(CallProvider),
+    CallProvider(Prompt),
 }
 
 #[rustfmt::skip]
 #[cfg_attr(
-    feature = "nota-text",
-    derive(nota::NotaDecode, nota::NotaDecodeTraced, nota::NotaEncode)
-)]
-#[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize, Clone, Debug, PartialEq, Eq)]
-pub struct CallProvider(Prompt);
-
-#[rustfmt::skip]
-#[cfg_attr(
-    feature = "nota-text",
-    derive(nota::NotaDecode, nota::NotaDecodeTraced, nota::NotaEncode)
+    feature = "dotos-text",
+    derive(dotos::DotosDecode, dotos::DotosDecodeTraced, dotos::DotosEncode)
 )]
 #[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum ProviderOutcome {
-    Completed(Completed),
-    Rejected(Rejected),
+    Completed(Completion),
+    Rejected(CallRejection),
 }
 
 #[rustfmt::skip]
 #[cfg_attr(
-    feature = "nota-text",
-    derive(nota::NotaDecode, nota::NotaDecodeTraced, nota::NotaEncode)
-)]
-#[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize, Clone, Debug, PartialEq, Eq)]
-pub struct Completed(Completion);
-
-#[rustfmt::skip]
-#[cfg_attr(
-    feature = "nota-text",
-    derive(nota::NotaDecode, nota::NotaDecodeTraced, nota::NotaEncode)
-)]
-#[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize, Clone, Debug, PartialEq, Eq)]
-pub struct Rejected(CallRejection);
-
-#[rustfmt::skip]
-#[cfg_attr(
-    feature = "nota-text",
-    derive(nota::NotaDecode, nota::NotaDecodeTraced, nota::NotaEncode)
+    feature = "dotos-text",
+    derive(dotos::DotosDecode, dotos::DotosDecodeTraced, dotos::DotosEncode)
 )]
 #[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum NexusWork {
-    SignalArrived(SignalArrived),
-    EffectCompleted(EffectCompleted),
+    SignalArrived(Prompt),
+    EffectCompleted(ProviderOutcome),
 }
 
 #[rustfmt::skip]
 #[cfg_attr(
-    feature = "nota-text",
-    derive(nota::NotaDecode, nota::NotaDecodeTraced, nota::NotaEncode)
+    feature = "dotos-text",
+    derive(dotos::DotosDecode, dotos::DotosDecodeTraced, dotos::DotosEncode)
 )]
 #[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum NexusAction {
-    ReplyToSignal(ReplyToSignal),
-    CommandEffect(CommandEffect),
-    Continue(Continue),
+    ReplyToSignal(ProviderOutcome),
+    CommandEffect(ProviderCallCommand),
+    Continue(NexusWork),
 }
 
 #[rustfmt::skip]
 #[cfg_attr(
-    feature = "nota-text",
-    derive(nota::NotaDecode, nota::NotaDecodeTraced, nota::NotaEncode)
+    feature = "dotos-text",
+    derive(dotos::DotosDecode, dotos::DotosDecodeTraced, dotos::DotosEncode)
 )]
 #[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum Input {
-    SignalArrived(SignalArrived),
-    EffectCompleted(EffectCompleted),
+    SignalArrived(Prompt),
+    EffectCompleted(ProviderOutcome),
 }
 
 #[rustfmt::skip]
 #[cfg_attr(
-    feature = "nota-text",
-    derive(nota::NotaDecode, nota::NotaDecodeTraced, nota::NotaEncode)
+    feature = "dotos-text",
+    derive(dotos::DotosDecode, dotos::DotosDecodeTraced, dotos::DotosEncode)
 )]
 #[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum Output {
-    ReplyToSignal(ReplyToSignal),
-    CommandEffect(CommandEffect),
-    Continue(Continue),
-}
-
-#[rustfmt::skip]
-impl SignalArrived {
-    pub fn new(payload: OrdinaryInput) -> Self {
-        Self(payload)
-    }
-    pub fn payload(&self) -> &OrdinaryInput {
-        &self.0
-    }
-    pub fn into_payload(self) -> OrdinaryInput {
-        self.0
-    }
-}
-#[rustfmt::skip]
-impl From<OrdinaryInput> for SignalArrived {
-    fn from(payload: OrdinaryInput) -> Self {
-        Self::new(payload)
-    }
-}
-
-#[rustfmt::skip]
-impl EffectCompleted {
-    pub fn new(payload: ProviderOutcome) -> Self {
-        Self(payload)
-    }
-    pub fn payload(&self) -> &ProviderOutcome {
-        &self.0
-    }
-    pub fn into_payload(self) -> ProviderOutcome {
-        self.0
-    }
-}
-#[rustfmt::skip]
-impl From<ProviderOutcome> for EffectCompleted {
-    fn from(payload: ProviderOutcome) -> Self {
-        Self::new(payload)
-    }
-}
-
-#[rustfmt::skip]
-impl ReplyToSignal {
-    pub fn new(payload: OrdinaryOutput) -> Self {
-        Self(payload)
-    }
-    pub fn payload(&self) -> &OrdinaryOutput {
-        &self.0
-    }
-    pub fn into_payload(self) -> OrdinaryOutput {
-        self.0
-    }
-}
-#[rustfmt::skip]
-impl From<OrdinaryOutput> for ReplyToSignal {
-    fn from(payload: OrdinaryOutput) -> Self {
-        Self::new(payload)
-    }
-}
-
-#[rustfmt::skip]
-impl CommandEffect {
-    pub fn new(payload: ProviderCallCommand) -> Self {
-        Self(payload)
-    }
-    pub fn payload(&self) -> &ProviderCallCommand {
-        &self.0
-    }
-    pub fn into_payload(self) -> ProviderCallCommand {
-        self.0
-    }
-}
-#[rustfmt::skip]
-impl From<ProviderCallCommand> for CommandEffect {
-    fn from(payload: ProviderCallCommand) -> Self {
-        Self::new(payload)
-    }
-}
-
-#[rustfmt::skip]
-impl Continue {
-    pub fn new(payload: NexusWork) -> Self {
-        Self(payload)
-    }
-    pub fn payload(&self) -> &NexusWork {
-        &self.0
-    }
-    pub fn into_payload(self) -> NexusWork {
-        self.0
-    }
-}
-#[rustfmt::skip]
-impl From<NexusWork> for Continue {
-    fn from(payload: NexusWork) -> Self {
-        Self::new(payload)
-    }
-}
-
-#[rustfmt::skip]
-impl CallProvider {
-    pub fn new(payload: Prompt) -> Self {
-        Self(payload)
-    }
-    pub fn payload(&self) -> &Prompt {
-        &self.0
-    }
-    pub fn into_payload(self) -> Prompt {
-        self.0
-    }
-}
-#[rustfmt::skip]
-impl From<Prompt> for CallProvider {
-    fn from(payload: Prompt) -> Self {
-        Self::new(payload)
-    }
-}
-
-#[rustfmt::skip]
-impl Completed {
-    pub fn new(payload: Completion) -> Self {
-        Self(payload)
-    }
-    pub fn payload(&self) -> &Completion {
-        &self.0
-    }
-    pub fn into_payload(self) -> Completion {
-        self.0
-    }
-}
-#[rustfmt::skip]
-impl From<Completion> for Completed {
-    fn from(payload: Completion) -> Self {
-        Self::new(payload)
-    }
-}
-
-#[rustfmt::skip]
-impl Rejected {
-    pub fn new(payload: CallRejection) -> Self {
-        Self(payload)
-    }
-    pub fn payload(&self) -> &CallRejection {
-        &self.0
-    }
-    pub fn into_payload(self) -> CallRejection {
-        self.0
-    }
-}
-#[rustfmt::skip]
-impl From<CallRejection> for Rejected {
-    fn from(payload: CallRejection) -> Self {
-        Self::new(payload)
-    }
+    ReplyToSignal(ProviderOutcome),
+    CommandEffect(ProviderCallCommand),
+    Continue(NexusWork),
 }
 
 #[rustfmt::skip]
 impl ProviderCallCommand {
     pub fn call_provider(payload: Prompt) -> Self {
-        Self::CallProvider(CallProvider::new(payload))
+        Self::CallProvider(payload)
     }
 }
 
 #[rustfmt::skip]
 impl ProviderOutcome {
     pub fn completed(payload: Completion) -> Self {
-        Self::Completed(Completed::new(payload))
-    }
-    pub fn rejected(payload: CallRejection) -> Self {
-        Self::Rejected(Rejected::new(payload))
-    }
-}
-
-#[rustfmt::skip]
-impl NexusWork {
-    pub fn signal_arrived(payload: OrdinaryInput) -> Self {
-        Self::SignalArrived(SignalArrived::new(payload))
-    }
-    pub fn effect_completed(payload: ProviderOutcome) -> Self {
-        Self::EffectCompleted(EffectCompleted::new(payload))
-    }
-}
-
-#[rustfmt::skip]
-impl NexusAction {
-    pub fn reply_to_signal(payload: OrdinaryOutput) -> Self {
-        Self::ReplyToSignal(ReplyToSignal::new(payload))
-    }
-    pub fn command_effect(payload: ProviderCallCommand) -> Self {
-        Self::CommandEffect(CommandEffect::new(payload))
-    }
-    pub fn r#continue(payload: NexusWork) -> Self {
-        Self::Continue(Continue::new(payload))
-    }
-}
-
-#[rustfmt::skip]
-impl Input {
-    pub fn signal_arrived(payload: OrdinaryInput) -> Self {
-        Self::SignalArrived(SignalArrived::new(payload))
-    }
-    pub fn effect_completed(payload: ProviderOutcome) -> Self {
-        Self::EffectCompleted(EffectCompleted::new(payload))
-    }
-}
-
-#[rustfmt::skip]
-impl Output {
-    pub fn reply_to_signal(payload: OrdinaryOutput) -> Self {
-        Self::ReplyToSignal(ReplyToSignal::new(payload))
-    }
-    pub fn command_effect(payload: ProviderCallCommand) -> Self {
-        Self::CommandEffect(CommandEffect::new(payload))
-    }
-    pub fn r#continue(payload: NexusWork) -> Self {
-        Self::Continue(Continue::new(payload))
-    }
-}
-
-#[rustfmt::skip]
-impl From<CallProvider> for ProviderCallCommand {
-    fn from(payload: CallProvider) -> Self {
-        Self::CallProvider(payload)
-    }
-}
-
-#[rustfmt::skip]
-impl From<Completed> for ProviderOutcome {
-    fn from(payload: Completed) -> Self {
         Self::Completed(payload)
     }
-}
-
-#[rustfmt::skip]
-impl From<Rejected> for ProviderOutcome {
-    fn from(payload: Rejected) -> Self {
+    pub fn rejected(payload: CallRejection) -> Self {
         Self::Rejected(payload)
     }
 }
 
 #[rustfmt::skip]
-impl From<SignalArrived> for NexusWork {
-    fn from(payload: SignalArrived) -> Self {
+impl NexusWork {
+    pub fn signal_arrived(payload: Prompt) -> Self {
         Self::SignalArrived(payload)
     }
-}
-
-#[rustfmt::skip]
-impl From<EffectCompleted> for NexusWork {
-    fn from(payload: EffectCompleted) -> Self {
+    pub fn effect_completed(payload: ProviderOutcome) -> Self {
         Self::EffectCompleted(payload)
     }
 }
 
 #[rustfmt::skip]
-impl From<ReplyToSignal> for NexusAction {
-    fn from(payload: ReplyToSignal) -> Self {
+impl NexusAction {
+    pub fn reply_to_signal(payload: ProviderOutcome) -> Self {
         Self::ReplyToSignal(payload)
     }
-}
-
-#[rustfmt::skip]
-impl From<CommandEffect> for NexusAction {
-    fn from(payload: CommandEffect) -> Self {
+    pub fn command_effect(payload: ProviderCallCommand) -> Self {
         Self::CommandEffect(payload)
     }
-}
-
-#[rustfmt::skip]
-impl From<Continue> for NexusAction {
-    fn from(payload: Continue) -> Self {
+    pub fn r#continue(payload: NexusWork) -> Self {
         Self::Continue(payload)
     }
 }
 
 #[rustfmt::skip]
-impl From<SignalArrived> for Input {
-    fn from(payload: SignalArrived) -> Self {
+impl Input {
+    pub fn signal_arrived(payload: Prompt) -> Self {
         Self::SignalArrived(payload)
     }
-}
-
-#[rustfmt::skip]
-impl From<EffectCompleted> for Input {
-    fn from(payload: EffectCompleted) -> Self {
+    pub fn effect_completed(payload: ProviderOutcome) -> Self {
         Self::EffectCompleted(payload)
     }
 }
 
 #[rustfmt::skip]
-impl From<ReplyToSignal> for Output {
-    fn from(payload: ReplyToSignal) -> Self {
+impl Output {
+    pub fn reply_to_signal(payload: ProviderOutcome) -> Self {
         Self::ReplyToSignal(payload)
     }
-}
-
-#[rustfmt::skip]
-impl From<CommandEffect> for Output {
-    fn from(payload: CommandEffect) -> Self {
+    pub fn command_effect(payload: ProviderCallCommand) -> Self {
         Self::CommandEffect(payload)
     }
-}
-
-#[rustfmt::skip]
-impl From<Continue> for Output {
-    fn from(payload: Continue) -> Self {
+    pub fn r#continue(payload: NexusWork) -> Self {
         Self::Continue(payload)
     }
 }
 
 #[rustfmt::skip]
-#[cfg(feature = "nota-text")]
+impl From<Prompt> for ProviderCallCommand {
+    fn from(payload: Prompt) -> Self {
+        Self::CallProvider(payload)
+    }
+}
+
+#[rustfmt::skip]
+impl From<Completion> for ProviderOutcome {
+    fn from(payload: Completion) -> Self {
+        Self::Completed(payload)
+    }
+}
+
+#[rustfmt::skip]
+impl From<CallRejection> for ProviderOutcome {
+    fn from(payload: CallRejection) -> Self {
+        Self::Rejected(payload)
+    }
+}
+
+#[rustfmt::skip]
+impl From<Prompt> for NexusWork {
+    fn from(payload: Prompt) -> Self {
+        Self::SignalArrived(payload)
+    }
+}
+
+#[rustfmt::skip]
+impl From<ProviderOutcome> for NexusWork {
+    fn from(payload: ProviderOutcome) -> Self {
+        Self::EffectCompleted(payload)
+    }
+}
+
+#[rustfmt::skip]
+impl From<ProviderOutcome> for NexusAction {
+    fn from(payload: ProviderOutcome) -> Self {
+        Self::ReplyToSignal(payload)
+    }
+}
+
+#[rustfmt::skip]
+impl From<ProviderCallCommand> for NexusAction {
+    fn from(payload: ProviderCallCommand) -> Self {
+        Self::CommandEffect(payload)
+    }
+}
+
+#[rustfmt::skip]
+impl From<NexusWork> for NexusAction {
+    fn from(payload: NexusWork) -> Self {
+        Self::Continue(payload)
+    }
+}
+
+#[rustfmt::skip]
+impl From<Prompt> for Input {
+    fn from(payload: Prompt) -> Self {
+        Self::SignalArrived(payload)
+    }
+}
+
+#[rustfmt::skip]
+impl From<ProviderOutcome> for Input {
+    fn from(payload: ProviderOutcome) -> Self {
+        Self::EffectCompleted(payload)
+    }
+}
+
+#[rustfmt::skip]
+impl From<ProviderOutcome> for Output {
+    fn from(payload: ProviderOutcome) -> Self {
+        Self::ReplyToSignal(payload)
+    }
+}
+
+#[rustfmt::skip]
+impl From<ProviderCallCommand> for Output {
+    fn from(payload: ProviderCallCommand) -> Self {
+        Self::CommandEffect(payload)
+    }
+}
+
+#[rustfmt::skip]
+impl From<NexusWork> for Output {
+    fn from(payload: NexusWork) -> Self {
+        Self::Continue(payload)
+    }
+}
+
+#[rustfmt::skip]
+#[cfg(feature = "dotos-text")]
 impl std::str::FromStr for Input {
-    type Err = NotaDecodeError;
+    type Err = DotosDecodeError;
     fn from_str(source: &str) -> Result<Self, Self::Err> {
-        NotaSource::new(source).parse::<Self>()
+        DotosSource::new(source).parse::<Self>()
     }
 }
 #[rustfmt::skip]
-#[cfg(feature = "nota-text")]
+#[cfg(feature = "dotos-text")]
 impl std::fmt::Display for Input {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter.write_str(&<Self as NotaEncode>::to_nota(self))
+        formatter.write_str(&<Self as DotosEncode>::to_dotos(self))
     }
 }
 
 #[rustfmt::skip]
-#[cfg(feature = "nota-text")]
+#[cfg(feature = "dotos-text")]
 impl std::str::FromStr for Output {
-    type Err = NotaDecodeError;
+    type Err = DotosDecodeError;
     fn from_str(source: &str) -> Result<Self, Self::Err> {
-        NotaSource::new(source).parse::<Self>()
+        DotosSource::new(source).parse::<Self>()
     }
 }
 #[rustfmt::skip]
-#[cfg(feature = "nota-text")]
+#[cfg(feature = "dotos-text")]
 impl std::fmt::Display for Output {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter.write_str(&<Self as NotaEncode>::to_nota(self))
+        formatter.write_str(&<Self as DotosEncode>::to_dotos(self))
     }
 }
 
 #[rustfmt::skip]
 #[cfg_attr(
-    feature = "nota-text",
-    derive(nota::NotaDecode, nota::NotaDecodeTraced, nota::NotaEncode)
+    feature = "dotos-text",
+    derive(dotos::DotosDecode, dotos::DotosDecodeTraced, dotos::DotosEncode)
 )]
 #[derive(
     rkyv::Archive,
@@ -525,8 +305,8 @@ impl NexusWork {
 
 #[rustfmt::skip]
 #[cfg_attr(
-    feature = "nota-text",
-    derive(nota::NotaDecode, nota::NotaDecodeTraced, nota::NotaEncode)
+    feature = "dotos-text",
+    derive(dotos::DotosDecode, dotos::DotosDecodeTraced, dotos::DotosEncode)
 )]
 #[derive(
     rkyv::Archive,
@@ -557,8 +337,8 @@ impl NexusAction {
 
 #[rustfmt::skip]
 #[cfg_attr(
-    feature = "nota-text",
-    derive(nota::NotaDecode, nota::NotaDecodeTraced, nota::NotaEncode)
+    feature = "dotos-text",
+    derive(dotos::DotosDecode, dotos::DotosDecodeTraced, dotos::DotosEncode)
 )]
 #[derive(
     rkyv::Archive,
@@ -605,8 +385,8 @@ impl NexusObjectName {
 
 #[rustfmt::skip]
 #[cfg_attr(
-    feature = "nota-text",
-    derive(nota::NotaDecode, nota::NotaDecodeTraced, nota::NotaEncode)
+    feature = "dotos-text",
+    derive(dotos::DotosDecode, dotos::DotosDecodeTraced, dotos::DotosEncode)
 )]
 #[derive(
     rkyv::Archive,
@@ -623,8 +403,8 @@ pub enum ObjectName {
 }
 #[rustfmt::skip]
 #[cfg_attr(
-    feature = "nota-text",
-    derive(nota::NotaDecode, nota::NotaDecodeTraced, nota::NotaEncode)
+    feature = "dotos-text",
+    derive(dotos::DotosDecode, dotos::DotosDecodeTraced, dotos::DotosEncode)
 )]
 #[derive(
     rkyv::Archive,
@@ -660,8 +440,8 @@ impl TraceEvent {
 
 #[rustfmt::skip]
 #[cfg_attr(
-    feature = "nota-text",
-    derive(nota::NotaDecode, nota::NotaDecodeTraced, nota::NotaEncode)
+    feature = "dotos-text",
+    derive(dotos::DotosDecode, dotos::DotosDecodeTraced, dotos::DotosEncode)
 )]
 #[derive(
     rkyv::Archive,
@@ -738,6 +518,12 @@ impl NexusAction {
 impl triad_runtime::NexusWork for NexusWork {}
 
 #[rustfmt::skip]
+impl triad_runtime::NexusEffectCommand for ProviderCallCommand {}
+
+#[rustfmt::skip]
+impl triad_runtime::NexusEffectResult for ProviderOutcome {}
+
+#[rustfmt::skip]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum EngineStartFailure {
     ResourceBusy(String),
@@ -781,6 +567,30 @@ impl std::fmt::Display for EngineStopFailure {
 impl std::error::Error for EngineStopFailure {}
 
 #[rustfmt::skip]
+pub type NexusRunnerNextStep = triad_runtime::NextStep<
+    ProviderOutcome,
+    std::convert::Infallible,
+    std::convert::Infallible,
+    ProviderCallCommand,
+    NexusWork,
+>;
+#[rustfmt::skip]
+impl triad_runtime::NexusAction for NexusAction {
+    type Reply = ProviderOutcome;
+    type SemaWrite = std::convert::Infallible;
+    type SemaRead = std::convert::Infallible;
+    type Effect = ProviderCallCommand;
+    type Work = NexusWork;
+    fn into_next_step(self) -> NexusRunnerNextStep {
+        match self {
+            Self::ReplyToSignal(output) => triad_runtime::NextStep::Reply(output),
+            Self::CommandEffect(effect) => triad_runtime::NextStep::RunEffect(effect),
+            Self::Continue(work) => triad_runtime::NextStep::Continue(work),
+        }
+    }
+}
+
+#[rustfmt::skip]
 pub trait NexusEngine: Send {
     fn on_start(&mut self) -> Result<(), EngineStartFailure> {
         Ok(())
@@ -795,6 +605,17 @@ pub trait NexusEngine: Send {
     fn trace_nexus_decided(&self) {
         self.trace_nexus_activation(NexusObjectName::Decided);
     }
+    fn continuation_limit(&self) -> triad_runtime::ContinuationLimit {
+        triad_runtime::ContinuationLimit::default()
+    }
+    fn run_effect(
+        &mut self,
+        input: ProviderCallCommand,
+    ) -> impl std::future::Future<Output = ProviderOutcome> + Send + '_;
+    fn budget_exhausted_reply(
+        &self,
+        exhausted: triad_runtime::ContinuationExhausted,
+    ) -> ProviderOutcome;
     fn decide(
         &mut self,
         input: nexus::Nexus<nexus::Work>,
@@ -802,13 +623,73 @@ pub trait NexusEngine: Send {
     fn execute(
         &mut self,
         input: nexus::Nexus<nexus::Work>,
-    ) -> impl std::future::Future<Output = nexus::Nexus<nexus::Action>> + Send + '_ {
+    ) -> impl std::future::Future<Output = nexus::Nexus<nexus::Action>> + Send + '_
+    where
+        Self: Sized,
+    {
         async move {
             self.trace_nexus_entered();
-            let output = self.decide(input);
+            let origin_route = input.origin_route();
+            let first_work = input.into_root();
+            let runner = triad_runtime::Runner::new(self.continuation_limit());
+            let mut runner_adapter = NexusRunnerAdapter::new(self, origin_route);
+            let reply = runner.drive(&mut runner_adapter, first_work).await;
+            let output = NexusAction::reply_to_signal(reply)
+                .with_origin_route(origin_route);
             self.trace_nexus_decided();
             output
         }
+    }
+}
+
+#[rustfmt::skip]
+struct NexusRunnerAdapter<'engine, Engine> {
+    engine: &'engine mut Engine,
+    origin_route: OriginRoute,
+}
+#[rustfmt::skip]
+impl<'engine, Engine> NexusRunnerAdapter<'engine, Engine> {
+    fn new(engine: &'engine mut Engine, origin_route: OriginRoute) -> Self {
+        Self { engine, origin_route }
+    }
+}
+#[rustfmt::skip]
+impl<'engine, Engine> triad_runtime::RunnerEngines
+for NexusRunnerAdapter<'engine, Engine>
+where
+    Engine: NexusEngine,
+{
+    type Reply = ProviderOutcome;
+    type SemaWrite = std::convert::Infallible;
+    type SemaRead = std::convert::Infallible;
+    type Effect = ProviderCallCommand;
+    type Work = NexusWork;
+    fn decide_next_step(
+        &mut self,
+        work: Self::Work,
+    ) -> triad_runtime::runner::RunnerNextStep<Self> {
+        let action = NexusEngine::decide(
+                self.engine,
+                work.with_origin_route(self.origin_route),
+            )
+            .into_root();
+        triad_runtime::NexusAction::into_next_step(action)
+    }
+    async fn apply_sema_write(&mut self, write: Self::SemaWrite) -> Self::Work {
+        match write {}
+    }
+    async fn observe_sema_read(&mut self, read: Self::SemaRead) -> Self::Work {
+        match read {}
+    }
+    async fn run_effect(&mut self, effect: Self::Effect) -> Self::Work {
+        let output: ProviderOutcome = NexusEngine::run_effect(self.engine, effect).await;
+        NexusWork::effect_completed(output)
+    }
+    fn budget_exhausted_reply(
+        &self,
+        exhausted: triad_runtime::ContinuationExhausted,
+    ) -> Self::Reply {
+        NexusEngine::budget_exhausted_reply(self.engine, exhausted)
     }
 }
 
