@@ -18,8 +18,8 @@ use dotos::Document;
 #[cfg(feature = "live-provider")]
 use serde_json::Value;
 use signal_agent::{
-    CallRejectionReason, ChatMessage, ChatTranscript, Input, MaximumOutputTokens, ModelName,
-    Output, OutputMode, Prompt, PromptOptions, ProviderName, SystemText, TemperatureMilli,
+    z2VLFu, z2VLbX, z2VMMe, z2VNAv, z2VRQS, z2VRdN, z2VRqc, z2VSHd, z2VUMb, z2VUN4, z2VV18, z2VVej,
+    z2VYSf, z2VahV, z2Vav4, z2Ve6M,
 };
 #[cfg(feature = "live-provider")]
 use std::{
@@ -88,58 +88,61 @@ fn engine_with_deepseek() -> AgentEngine {
     )
 }
 
-fn guardian_prompt(provider: Option<&str>) -> Prompt {
-    Prompt::new(
-        Some(SystemText::new("You judge intent.".to_owned())),
-        ChatTranscript::new(vec![ChatMessage::user(
-            "Reply exactly with this DOTOS expression: (Verdict accepted)",
-        )]),
-        PromptOptions::new(
-            Some(ModelName::new(DEEPSEEK_MODEL.to_owned())),
-            provider.map(|name| ProviderName::new(name.to_owned())),
-            Some(TemperatureMilli::new(0)),
-            Some(MaximumOutputTokens::new(64)),
-            OutputMode::Dotos,
-            None,
-            None,
-        ),
-    )
+fn guardian_prompt(provider: Option<&str>) -> z2VMMe {
+    z2VMMe {
+        field_0: Some(z2VahV::new("You judge intent.".to_owned())),
+        field_1: z2VLbX::new(vec![z2Vav4 {
+            field_0: z2VRdN::z2Va7M,
+            field_1: z2VV18::new(
+                "Reply exactly with this DOTOS expression: (Verdict accepted)".to_owned(),
+            ),
+        }]),
+        field_2: z2VLFu {
+            field_0: Some(z2VUMb::new(DEEPSEEK_MODEL.to_owned())),
+            field_1: provider.map(|name| z2VRqc::new(name.to_owned())),
+            field_2: Some(z2VRQS::new(0)),
+            field_3: Some(z2VYSf::new(64)),
+            field_4: z2VSHd::z2VPna,
+            field_5: None,
+            field_6: None,
+        },
+    }
 }
 
 #[cfg(feature = "live-provider")]
-fn provider_prompt(provider: &str, model: &str) -> Prompt {
-    Prompt::new(
-        Some(SystemText::new("You classify one record.".to_owned())),
-        ChatTranscript::new(vec![ChatMessage::user("Return (Verdict accepted)")]),
-        PromptOptions::new(
-            Some(ModelName::new(model.to_owned())),
-            Some(ProviderName::new(provider.to_owned())),
-            Some(TemperatureMilli::new(0)),
-            Some(MaximumOutputTokens::new(64)),
-            OutputMode::Dotos,
-            None,
-            None,
-        ),
-    )
+fn provider_prompt(provider: &str, model: &str) -> z2VMMe {
+    z2VMMe {
+        field_0: Some(z2VahV::new("You classify one record.".to_owned())),
+        field_1: z2VLbX::new(vec![z2Vav4 {
+            field_0: z2VRdN::z2Va7M,
+            field_1: z2VV18::new("Return (Verdict accepted)".to_owned()),
+        }]),
+        field_2: z2VLFu {
+            field_0: Some(z2VUMb::new(model.to_owned())),
+            field_1: Some(z2VRqc::new(provider.to_owned())),
+            field_2: Some(z2VRQS::new(0)),
+            field_3: Some(z2VYSf::new(64)),
+            field_4: z2VSHd::z2VPna,
+            field_5: None,
+            field_6: None,
+        },
+    }
 }
 
 #[tokio::test]
 async fn fixture_provider_completes_a_call_offline() {
     let mut engine = engine_with_deepseek();
     let output = engine
-        .handle(Input::Call(signal_agent::Call::new(guardian_prompt(Some(
+        .handle(z2VNAv::z2VRrf(z2VVej::new(guardian_prompt(Some(
             DEEPSEEK_PROVIDER,
         )))))
         .await;
     match output {
-        Output::Completed(completion) => {
+        z2Ve6M::z2VRXc(completion) => {
             // The fixture returns a valid generic DOTOS expression; domain-specific
             // response contracts belong to the caller prompt, not the provider fixture.
-            assert_eq!(
-                completion.completion_text.payload(),
-                "(FixtureCompletion ok)"
-            );
-            assert_eq!(completion.stop_reason_text.payload(), "stop");
+            assert_eq!(completion.field_0.payload(), "(FixtureCompletion ok)");
+            assert_eq!(completion.field_1.payload(), "stop");
         }
         other => panic!("expected a completion, got {other:?}"),
     }
@@ -153,14 +156,11 @@ async fn call_with_no_configured_provider_is_rejected() {
         Box::new(LiteralKeySource),
     );
     let output = engine
-        .handle(Input::Call(signal_agent::Call::new(guardian_prompt(None))))
+        .handle(z2VNAv::z2VRrf(z2VVej::new(guardian_prompt(None))))
         .await;
     match output {
-        Output::CallRejected(rejection) => {
-            assert_eq!(
-                rejection.call_rejection_reason,
-                CallRejectionReason::NoProviderConfigured
-            );
+        z2Ve6M::z2VR63(rejection) => {
+            assert_eq!(rejection.field_0, z2VUN4::z2VS9d);
         }
         other => panic!("expected a rejection, got {other:?}"),
     }
@@ -172,9 +172,9 @@ async fn default_provider_is_used_when_prompt_names_none() {
     // No provider named in the prompt; the registry default (deepseek, the first
     // configured) resolves the call.
     let output = engine
-        .handle(Input::Call(signal_agent::Call::new(guardian_prompt(None))))
+        .handle(z2VNAv::z2VRrf(z2VVej::new(guardian_prompt(None))))
         .await;
-    assert!(matches!(output, Output::Completed(_)));
+    assert!(matches!(output, z2Ve6M::z2VRXc(_)));
 }
 
 #[tokio::test]
@@ -194,23 +194,17 @@ async fn dotos_output_rejects_empty_document() {
         Box::new(LiteralKeySource),
     );
     let output = engine
-        .handle(Input::Call(signal_agent::Call::new(guardian_prompt(Some(
+        .handle(z2VNAv::z2VRrf(z2VVej::new(guardian_prompt(Some(
             DEEPSEEK_PROVIDER,
         )))))
         .await;
     match output {
-        Output::CallRejected(rejection) => {
-            assert_eq!(
-                rejection.call_rejection_reason,
-                CallRejectionReason::InvalidDotosOutput
-            );
+        z2Ve6M::z2VR63(rejection) => {
+            assert_eq!(rejection.field_0, z2VUN4::z2VQdg);
             assert!(
-                rejection
-                    .rejection_detail
-                    .payload()
-                    .contains("expected exactly one"),
+                rejection.field_1.payload().contains("expected exactly one"),
                 "unexpected rejection detail: {:?}",
-                rejection.rejection_detail
+                rejection.field_1
             );
         }
         other => panic!("expected InvalidDotosOutput rejection, got {other:?}"),
@@ -234,23 +228,17 @@ async fn dotos_output_rejects_multiple_root_objects() {
         Box::new(LiteralKeySource),
     );
     let output = engine
-        .handle(Input::Call(signal_agent::Call::new(guardian_prompt(Some(
+        .handle(z2VNAv::z2VRrf(z2VVej::new(guardian_prompt(Some(
             DEEPSEEK_PROVIDER,
         )))))
         .await;
     match output {
-        Output::CallRejected(rejection) => {
-            assert_eq!(
-                rejection.call_rejection_reason,
-                CallRejectionReason::InvalidDotosOutput
-            );
+        z2Ve6M::z2VR63(rejection) => {
+            assert_eq!(rejection.field_0, z2VUN4::z2VQdg);
             assert!(
-                rejection
-                    .rejection_detail
-                    .payload()
-                    .contains("expected exactly one"),
+                rejection.field_1.payload().contains("expected exactly one"),
                 "unexpected rejection detail: {:?}",
-                rejection.rejection_detail
+                rejection.field_1
             );
         }
         other => panic!("expected InvalidDotosOutput rejection, got {other:?}"),
@@ -493,13 +481,13 @@ async fn live_deepseek_flash_returns_valid_dotos_with_gopass_key() {
         Box::new(agent::provider::OpenAiCompatibleProvider::new()),
     );
     let output = engine
-        .handle(Input::Call(signal_agent::Call::new(guardian_prompt(Some(
+        .handle(z2VNAv::z2VRrf(z2VVej::new(guardian_prompt(Some(
             DEEPSEEK_PROVIDER,
         )))))
         .await;
     match output {
-        Output::Completed(completion) => {
-            let text = completion.completion_text.payload();
+        z2Ve6M::z2VRXc(completion) => {
+            let text = completion.field_0.payload();
             Document::parse(text).expect("live DeepSeek completion must be valid DOTOS");
             assert!(
                 text.contains("Verdict"),

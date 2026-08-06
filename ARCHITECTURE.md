@@ -15,41 +15,26 @@ Harness backends are deferred. Providers are configuration: a generic
 OpenAI-compatible API (endpoint + model + typed secret-source reference), so
 adding one is a `ConfigureProvider` message, never code.
 
-## Runtime triad
+## Runtime boundary
 
-The daemon is schema-derived on the emitted runtime. The working tier's
-`Input`/`Output` come from the dependency contract `signal-agent`; the
-daemon-local plane schemas declare the Nexus and SEMA planes.
-
-| Plane | Schema | Role |
-|---|---|---|
-| Signal | `signal-agent` (dependency `WireContract`) | the wire surface; emitted spine decodes `Input`, encodes `Output` |
-| Nexus | `schema/nexus.schema` | the decision + the one external effect: `CallProvider` |
-| SEMA | `schema/sema.schema` | honestly stateless (registry held in the engine; redb projection deferred) |
-
-`AgentEngine` is the data-bearing noun the generated `NexusEngine` and
-`SemaEngine` traits attach to. It owns the provider registry, the boxed
-`Provider`, and the boxed `KeySource`.
+The daemon consumes the authority-sealed `signal-agent` and
+`meta-signal-agent` contracts directly. It owns no schema, generated interface,
+or parallel naming boundary. `AgentEngine` owns the provider registry, the
+boxed `Provider`, and the boxed `KeySource`; `AgentRuntime` binds each socket
+authority to its canonical contract.
 
 ## The call path — the async effect seam
 
 ```text
-Call(Prompt)  --Signal-->  NexusWork::SignalArrived
-  -> NexusEngine::decide  ->  CommandEffect(CallProvider(Prompt))
-  -> generated async runner awaits NexusEngine::run_effect
-       -> registry.resolve(prompt) -> ProviderCall (endpoint, model, key, messages)
-       -> Provider::complete(call).await        <-- the only network IO
-       -> ProviderOutcome::{Completed | Rejected}
-  -> NexusWork::EffectCompleted
-  -> NexusEngine::decide  ->  ReplyToSignal(Output::Completed | CallRejected)
+Call(Prompt)  --Signal-->  AgentEngine::handle
+  -> registry.resolve(prompt) -> ProviderCall (endpoint, model, key, messages)
+  -> Provider::complete(call).await              <-- the only network IO
+  -> Output::{Completed | CallRejected}
 Output  --Signal-->  wire
 ```
 
-The HTTPS call is the Nexus `CallProvider` effect. The generated runner awaits
-`run_effect` off the engine mailbox — no blocking inside an actor handler
-(`primary/skills/actor-systems.md` §"Blocking is a design bug"). This is the
-load-bearing discipline: the provider call is an async effect, never an inline
-blocking await.
+The HTTPS call is an asynchronous effect; no blocking network operation enters
+the runtime.
 
 ## The provider plane
 
@@ -80,17 +65,17 @@ may also advertise `gpt-5.5` for explicit fallback runs. If that local server is
 started with its own API-key gate, use `Environment` or `File` instead. Tests
 inject a literal key source so a fixture call needs no process environment.
 
-The registry is configured through the meta tier (`handle_meta_connection`
-decodes `meta_signal_agent::Input`, mutates the registry) and seeded at startup
+The registry is configured through the meta tier (which decodes the canonical
+meta request, then mutates the registry) and seeded at startup
 from the binary configuration's `bootstrap_providers`.
 
 ## Two authority tiers
 
-- **Working tier** (`signal-agent`): `Call` / `StreamCall` / `CancelStream`. The
-  generated spine runs `handle_working_input` -> `AgentEngine::handle`.
+- **Working tier** (`signal-agent`): `Call` / `StreamCall` / `CancelStream`.
+  `AgentRuntime` decodes the bound frame and invokes `AgentEngine::handle`.
 - **Meta tier** (`meta-signal-agent`): `ConfigureProvider` / `RetireProvider` /
   `SetDefaultProvider` / `Start` / `Stop`, on a `0o600` socket. Decoded by the
-  component-owned `handle_meta_connection`; mutates the registry.
+  the concrete meta turn; mutates the registry.
 
 ## The one-argument rule
 
@@ -105,24 +90,20 @@ the environment, binary frame to the daemon, DOTOS reply on stdout.
 - Harness backends (Claude Code / Codex / Pi) — out of scope by psyche decision.
 - `StreamCall` / `CancelStream` — contract-complete; the daemon replies
   `RequestUnimplemented` until the streaming runner lands.
-- The redb (SEMA) durable projection of the provider registry — the registry is
+- The durable projection of the provider registry — the registry is
   in-memory, re-supplied by meta `Configure` on restart.
 - The contract dependencies are consumed from `signal-agent` and
-  `meta-signal-agent` main. Contract source and generated wire nouns stay in
-  those repos; this daemon imports them and emits only its runtime planes.
+  `meta-signal-agent` at exact revisions. Contract authority and its Rust
+  projection stay in those repos; this daemon owns neither.
 
 ## Code map
 
 ```text
-schema/nexus.schema        Nexus plane (decision + CallProvider effect)
-schema/sema.schema         SEMA plane (stateless)
-build.rs                   two-tier daemon shape (signal-agent working + meta tier)
-src/schema/{nexus,sema,daemon}.rs   generated runtime (freshness-checked)
-src/engine.rs              AgentEngine: NexusEngine + SemaEngine impls
+src/daemon.rs              concrete two-authority socket runtime
+src/engine.rs              AgentEngine: contract input -> provider effect -> contract output
 src/provider.rs            Provider trait, FixtureProvider, OpenAiCompatibleProvider
 src/registry.rs            ProviderRegistry, KeySource, ProviderEntry
 src/config.rs              binary rkyv AgentDaemonConfiguration
-src/schema_daemon.rs       ComponentDaemon impl + meta-tier projection
 src/client.rs              CLI daemon client
 src/bin/agent.rs           CLI binary
 src/bin/agent_daemon.rs    daemon binary

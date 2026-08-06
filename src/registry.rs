@@ -10,7 +10,7 @@
 use std::path::Path;
 
 use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
-use signal_agent::{ChatMessage, Prompt};
+use signal_agent::{z2VMMe, z2Vav4};
 use thiserror::Error;
 
 use crate::provider::{ProviderApiKey, ProviderAuthorization, ProviderCall, ProviderMessage};
@@ -97,19 +97,19 @@ impl SecretSource {
     }
 }
 
-impl From<meta_signal_agent::SecretSource> for SecretSource {
-    fn from(source: meta_signal_agent::SecretSource) -> Self {
+impl From<meta_signal_agent::z2Veh3> for SecretSource {
+    fn from(source: meta_signal_agent::z2Veh3) -> Self {
         match source {
-            meta_signal_agent::SecretSource::Environment(secret) => {
+            meta_signal_agent::z2Veh3::z2VSU1(secret) => {
                 Self::environment(secret.into_payload().into_payload())
             }
-            meta_signal_agent::SecretSource::Gopass(secret) => {
+            meta_signal_agent::z2Veh3::z2VevM(secret) => {
                 Self::gopass(secret.into_payload().into_payload())
             }
-            meta_signal_agent::SecretSource::File(secret) => {
+            meta_signal_agent::z2Veh3::z2VRsH(secret) => {
                 Self::file(secret.into_payload().into_payload())
             }
-            meta_signal_agent::SecretSource::NoSecret => Self::no_secret(),
+            meta_signal_agent::z2Veh3::z2Vezi => Self::no_secret(),
         }
     }
 }
@@ -166,8 +166,7 @@ pub enum ResolveError {
 }
 
 /// The set of configured providers plus the default. Held in the engine;
-/// configured through the meta tier. The durable-redb projection is deferred
-/// (see `schema/sema.schema`).
+/// configured through the meta tier. Its durable projection is deferred.
 #[derive(Debug, Clone, Default)]
 pub struct ProviderRegistry {
     entries: Vec<ProviderEntry>,
@@ -230,13 +229,13 @@ impl ProviderRegistry {
     /// and project the chat transcript.
     pub async fn resolve(
         &self,
-        prompt: &Prompt,
+        prompt: &z2VMMe,
         keys: &(dyn KeySource + Send + Sync),
     ) -> Result<ProviderCall, ResolveError> {
-        let options = prompt.prompt_options();
-        let provider_name = prompt
-            .prompt_options()
-            .provider()
+        let options = &prompt.field_2;
+        let provider_name = options
+            .field_1
+            .as_ref()
             .map(|provider| provider.payload().clone())
             .or_else(|| self.default_provider.clone())
             .ok_or(ResolveError::NoProviderConfigured)?;
@@ -244,7 +243,7 @@ impl ProviderRegistry {
             .entry(&provider_name)
             .ok_or_else(|| ResolveError::ProviderUnknown(provider_name.clone()))?;
         let model = options
-            .model()
+            .field_0
             .as_ref()
             .map(|model| model.payload().clone())
             .unwrap_or_else(|| entry.default_model().to_owned());
@@ -261,27 +260,29 @@ impl ProviderRegistry {
             entry.endpoint().to_owned(),
             model,
             authorization,
-            prompt.system().map(|system| system.payload().clone()),
             prompt
-                .chat_transcript()
+                .field_0
+                .as_ref()
+                .map(|system| system.payload().clone()),
+            prompt
+                .field_1
                 .payload()
                 .iter()
                 .map(Self::project_message)
                 .collect(),
-            options.output_mode(),
+            options.field_4.clone(),
             options
-                .temperature_milli()
+                .field_2
+                .as_ref()
                 .map(|temperature| *temperature.payload()),
-            options
-                .maximum_output_tokens()
-                .map(|maximum| *maximum.payload()),
-            options.reasoning_effort().copied(),
-            options.thinking_mode().copied(),
+            options.field_3.as_ref().map(|maximum| *maximum.payload()),
+            options.field_5.clone(),
+            options.field_6.clone(),
         ))
     }
 
-    fn project_message(message: &ChatMessage) -> ProviderMessage {
-        ProviderMessage::new(message.chat_role, message.user_text.payload().clone())
+    fn project_message(message: &z2Vav4) -> ProviderMessage {
+        ProviderMessage::new(message.field_0.clone(), message.field_1.payload().clone())
     }
 }
 

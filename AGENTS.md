@@ -15,8 +15,8 @@ Load-bearing rules for this repo:
 - API keys are daemon-resolved secret-source references, never hardcoded; the
   secret value is never logged or persisted.
 - The daemon takes exactly one binary rkyv argument and never parses DOTOS.
-- Edit `schema/nexus.schema` / `schema/sema.schema` and regenerate
-  (`AGENT_UPDATE_SCHEMA_ARTIFACTS=1 cargo build`); never hand-edit
-  `src/schema/*.rs`.
+- The ordinary and meta contracts come only from `signal-agent` and
+  `meta-signal-agent`. The runtime owns no schema inputs, generated modules, or
+  schema build lane.
 - `cargo test` runs the offline fixture round-trip; the live-network test gates
   on `--features live-provider` plus a key in the environment.

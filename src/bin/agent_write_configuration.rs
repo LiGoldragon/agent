@@ -13,7 +13,7 @@ use agent::{
     registry::SecretSource as RuntimeSecretSource,
 };
 use dotos::{DotosDecode, DotosDecodeError, DotosEncode, DotosSource};
-use meta_signal_agent::SecretSource as ConfigurationWriterSecretSource;
+use meta_signal_agent::z2Veh3;
 use thiserror::Error;
 use triad_runtime::{ArgumentError, ComponentArgument, ComponentCommand};
 
@@ -59,7 +59,7 @@ enum ProviderSeed {
         ConfigurationWriterProviderName,
         ConfigurationWriterEndpoint,
         ConfigurationWriterModelName,
-        ConfigurationWriterSecretSource,
+        z2Veh3,
     ),
 }
 

@@ -16,7 +16,7 @@
 //! serves every configured provider — only the endpoint, model, and
 //! authorization differ.
 
-use signal_agent::{ChatRole, OutputMode, ReasoningEffort, ThinkingMode};
+use signal_agent::{z2VKsS, z2VRdN, z2VSHd, z2VXxS};
 
 /// One fully-resolved provider call: the registry has already turned a
 /// `ProviderName` into an endpoint, a model, and the resolved authorization.
@@ -29,11 +29,11 @@ pub struct ProviderCall {
     authorization: ProviderAuthorization,
     system: Option<String>,
     messages: Vec<ProviderMessage>,
-    output_mode: OutputMode,
+    output_mode: z2VSHd,
     temperature_milli: Option<u64>,
     maximum_output_tokens: Option<u64>,
-    reasoning_effort: Option<ReasoningEffort>,
-    thinking_mode: Option<ThinkingMode>,
+    reasoning_effort: Option<z2VKsS>,
+    thinking_mode: Option<z2VXxS>,
 }
 
 /// The instruction the daemon folds into the system message for `OutputMode::Dotos`:
@@ -50,11 +50,11 @@ impl ProviderCall {
         authorization: ProviderAuthorization,
         system: Option<String>,
         messages: Vec<ProviderMessage>,
-        output_mode: OutputMode,
+        output_mode: z2VSHd,
         temperature_milli: Option<u64>,
         maximum_output_tokens: Option<u64>,
-        reasoning_effort: Option<ReasoningEffort>,
-        thinking_mode: Option<ThinkingMode>,
+        reasoning_effort: Option<z2VKsS>,
+        thinking_mode: Option<z2VXxS>,
     ) -> Self {
         Self {
             endpoint: endpoint.into(),
@@ -90,12 +90,12 @@ impl ProviderCall {
         &self.messages
     }
 
-    pub fn output_mode(&self) -> OutputMode {
-        self.output_mode
+    pub fn output_mode(&self) -> z2VSHd {
+        self.output_mode.clone()
     }
 
     pub fn is_dotos(&self) -> bool {
-        matches!(self.output_mode, OutputMode::Dotos)
+        matches!(self.output_mode, z2VSHd::z2VPna)
     }
 
     pub fn temperature(&self) -> Option<f64> {
@@ -110,9 +110,9 @@ impl ProviderCall {
     /// (`low`/`medium`/`high`), derived from the typed `ReasoningEffort`.
     pub fn reasoning_effort(&self) -> Option<&'static str> {
         match self.reasoning_effort.as_ref()? {
-            ReasoningEffort::Low => Some("low"),
-            ReasoningEffort::Medium => Some("medium"),
-            ReasoningEffort::High => Some("high"),
+            z2VKsS::z2VMyX => Some("low"),
+            z2VKsS::z2VVD9 => Some("medium"),
+            z2VKsS::z2VVUc => Some("high"),
         }
     }
 
@@ -120,8 +120,8 @@ impl ProviderCall {
     /// top-level `thinking` object, derived from the typed `ThinkingMode`.
     pub fn thinking_directive(&self) -> Option<&'static str> {
         match self.thinking_mode.as_ref()? {
-            ThinkingMode::Enabled => Some("enabled"),
-            ThinkingMode::Disabled => Some("disabled"),
+            z2VXxS::z2VeVv => Some("enabled"),
+            z2VXxS::z2VbC1 => Some("disabled"),
         }
     }
 
@@ -142,12 +142,9 @@ impl ProviderCall {
     /// correction turn — the single retry the daemon makes when DOTOS validation fails.
     pub fn with_dotos_correction(&self, previous: &str, parse_error: &str) -> Self {
         let mut messages = self.messages.clone();
+        messages.push(ProviderMessage::new(z2VRdN::z2VfEc, previous.to_owned()));
         messages.push(ProviderMessage::new(
-            ChatRole::Assistant,
-            previous.to_owned(),
-        ));
-        messages.push(ProviderMessage::new(
-            ChatRole::User,
+            z2VRdN::z2Va7M,
             format!(
                 "That response was not valid DOTOS ({parse_error}). Reply with exactly one valid DOTOS expression and nothing else."
             ),
@@ -225,12 +222,12 @@ impl std::fmt::Debug for ProviderAuthorization {
 /// One chat turn handed to a provider, projected from the contract `ChatRole`.
 #[derive(Debug, Clone)]
 pub struct ProviderMessage {
-    role: ChatRole,
+    role: z2VRdN,
     content: String,
 }
 
 impl ProviderMessage {
-    pub fn new(role: ChatRole, content: impl Into<String>) -> Self {
+    pub fn new(role: z2VRdN, content: impl Into<String>) -> Self {
         Self {
             role,
             content: content.into(),
@@ -238,10 +235,10 @@ impl ProviderMessage {
     }
 
     pub fn role_name(&self) -> &'static str {
-        match self.role {
-            ChatRole::System => "system",
-            ChatRole::User => "user",
-            ChatRole::Assistant => "assistant",
+        match &self.role {
+            z2VRdN::z2VNn5 => "system",
+            z2VRdN::z2Va7M => "user",
+            z2VRdN::z2VfEc => "assistant",
         }
     }
 
@@ -309,8 +306,8 @@ impl FixtureProvider {
             .map(|message| message.content())
             .unwrap_or("");
         let text = match call.output_mode() {
-            OutputMode::Dotos => "(FixtureCompletion ok)".to_owned(),
-            OutputMode::FreeText => format!("fixture completion for: {last_user}"),
+            z2VSHd::z2VPna => "(FixtureCompletion ok)".to_owned(),
+            z2VSHd::z2Va7b => format!("fixture completion for: {last_user}"),
         };
         ProviderCompletion {
             text,

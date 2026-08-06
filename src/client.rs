@@ -10,7 +10,8 @@ use std::io::Write;
 use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
 
-use signal_agent::{DotosEncode, FrameBody as SignalFrameBody, Input, Output};
+use dotos::{DotosEncode, DotosSource};
+use signal_agent::{FrameBody as SignalFrameBody, z2VNAv, z2Ve6M};
 use signal_frame::{ExchangeIdentifier, ExchangeLane, LaneSequence, Reply, SessionEpoch, SubReply};
 use triad_runtime::{FrameBody, LengthPrefixedCodec};
 
@@ -56,7 +57,7 @@ impl AgentClient {
         }
     }
 
-    pub fn call(&self, input: Input) -> Result<Output> {
+    pub fn call(&self, input: z2VNAv) -> Result<z2Ve6M> {
         let mut stream = UnixStream::connect(self.socket.path())?;
         let exchange = ExchangeIdentifier::new(
             SessionEpoch::new(0),
@@ -109,7 +110,7 @@ impl CommandLine {
         let argument = self
             .argument
             .ok_or_else(|| Error::Io(std::io::Error::other("missing DOTOS request argument")))?;
-        let input: Input = argument
+        let input: z2VNAv = DotosSource::new(&argument)
             .parse()
             .map_err(|error| Error::Io(std::io::Error::other(format!("invalid DOTOS: {error}"))))?;
         let socket = AgentSocket::from_environment()
