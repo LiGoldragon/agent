@@ -20,3 +20,9 @@ Load-bearing rules for this repo:
   `src/schema/*.rs`.
 - `cargo test` runs the offline fixture round-trip; the live-network test gates
   on `--features live-provider` plus a key in the environment.
+
+## Protos estate status
+
+Stack: correct-new destination
+Status: active component, current checkout legacy-wired
+This checkout is not proof of correct-new adoption.
