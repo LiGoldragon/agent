@@ -106,3 +106,35 @@ fn configuration_writer_accepts_local_provider_without_secret() {
         agent::registry::SecretSource::NoSecret
     ));
 }
+
+#[test]
+fn configuration_writer_accepts_openrouter_with_a_gopass_secret_reference() {
+    let sandbox = ConfigurationWriterSandbox::new();
+    let request = format!(
+        "AgentConfigurationWriteRequest.{{{} {} 384 {} [ProviderSeed.{{openrouter https://openrouter.ai/api/v1 openai/gpt-6-luna Gopass.platform.openrouter.ai/api-key}}] {}}}",
+        sandbox.ordinary_socket_path.display(),
+        sandbox.meta_socket_path.display(),
+        sandbox.database_path.display(),
+        sandbox.output_path.display()
+    );
+    let output = Command::new(env!("CARGO_BIN_EXE_agent-write-configuration"))
+        .arg(request)
+        .output()
+        .expect("run agent-write-configuration");
+    assert!(
+        output.status.success(),
+        "writer failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let configuration =
+        AgentDaemonConfiguration::from_binary_path(sandbox.output_path()).expect("read archive");
+    let provider = &configuration.bootstrap_providers()[0];
+    assert_eq!(provider.name, "openrouter");
+    assert_eq!(provider.endpoint, "https://openrouter.ai/api/v1");
+    assert_eq!(provider.default_model, "openai/gpt-6-luna");
+    assert!(matches!(
+        provider.secret_source,
+        agent::registry::SecretSource::Gopass(_)
+    ));
+}
