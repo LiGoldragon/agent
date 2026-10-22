@@ -20,7 +20,7 @@ impl ConfigurationWriterSandbox {
         Self {
             ordinary_socket_path: directory.path().join("agent.sock"),
             meta_socket_path: directory.path().join("agent-meta.sock"),
-            database_path: directory.path().join("agent.sema"),
+            database_path: directory.path().join("agent.memory"),
             output_path: directory.path().join("agent.config.rkyv"),
             _directory: directory,
         }
